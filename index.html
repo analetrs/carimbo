@@ -1,0 +1,1645 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Carimbo">
+<meta name="theme-color" content="#020202">
+<link rel="apple-touch-icon" href="icon.png">
+<title>Carimbo · protótipo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* =====================================================================
+   CARIMBO · protótipo clicável do frequentador (tema Noite)
+   Tokens, filtros, chapas D8, tickets, passaporte e carimbos vêm da
+   carimbo-landing-v4.html e de experimentos/tinta-e-botoes.html.
+   Nada aqui funciona de verdade: o estado é falso e fica na memória.
+   ===================================================================== */
+:root{
+  --surface:#020202; --raised:#241c30; --sunken:#3a2f47;
+  --papel:#f0ece2; --on-papel:#020202;
+  --ink:#fbfbfb; --ink-muted:#b4aeb9; --hairline:#443f38; --border-control:#87877f;
+  --focus:#cbec50; --carimbo-azul:#9db4ff;
+
+  --tinta-rosa:#f06dc3; --tinta-laranja:#f29049; --tinta-lima:#a0d248; --tinta-ciano:#5db3da;
+  --c-rosa:#f07ac0; --c-azul:#9db4ff; --c-verm:#ff8a80; --c-verde:#9fdc7d;   /* carimbo sobre Noite */
+  --p-rosa:#d5308e; --p-azul:#080aa0; --p-verm:#a8322b; --p-verde:#2f6a1b;   /* carimbo sobre papel */
+
+  --font-body:-apple-system,"SF Pro Text",system-ui,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --font-display:-apple-system,"SF Pro Display",system-ui,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --font-xl:"Archivo",var(--font-display);
+  --font-mono:"DM Mono",ui-monospace,Menlo,monospace;
+
+  --mola:cubic-bezier(.34,1.8,.5,1);
+  --saida:cubic-bezier(.2,.8,.2,1);
+  --tinta-opacidade:.92;
+
+  --top:max(env(safe-area-inset-top),14px);
+  --bot:max(env(safe-area-inset-bottom),10px);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;margin:0;background:var(--surface);overscroll-behavior:none}
+body{color:var(--ink);font-family:var(--font-body);font-size:15px;line-height:22px;-webkit-font-smoothing:antialiased;
+  -webkit-user-select:none;user-select:none;-webkit-touch-callout:none;touch-action:manipulation;overflow:hidden}
+h1,h2,h3,p{margin:0}
+button{font:inherit;color:inherit;border:0;background:none;padding:0;cursor:pointer}
+input,textarea{font:inherit;font-size:16px;color:inherit;-webkit-user-select:text;user-select:text}
+:focus-visible{outline:2px solid var(--focus);outline-offset:3px}
+
+/* ---------- aparelho: tela cheia no iPhone, moldura de 390×844 no computador ---------- */
+#device{position:fixed;inset:0;overflow:hidden;background:var(--surface);isolation:isolate}
+/* grão removido em 08/11 (fica só na arte) */
+.fake-status,.home-ind{display:none}
+#roteiro{display:none}
+
+@media (min-width:700px) and (min-height:700px){
+  body{background:#0b0910;display:grid;place-items:center}
+  #device{position:relative;inset:auto;width:390px;height:844px;border-radius:56px;
+    box-shadow:0 0 0 11px #18131f,0 0 0 12px #3a2f47,0 50px 120px rgba(0,0,0,.7);
+    --top:54px;--bot:26px}
+  .fake-status{display:flex;position:absolute;z-index:96;top:0;left:0;right:0;height:50px;padding:16px 34px 0 46px;
+    justify-content:space-between;align-items:center;font:600 16px/1 var(--font-display);pointer-events:none}
+  .fake-status::after{content:"";position:absolute;left:50%;top:11px;width:124px;height:36px;margin-left:-62px;border-radius:20px;background:#000}
+  .fake-status small{font:600 14px/1 var(--font-display);letter-spacing:.02em}
+  .home-ind{display:block;position:absolute;z-index:96;left:50%;bottom:8px;width:134px;height:5px;margin-left:-67px;border-radius:3px;background:var(--ink);pointer-events:none}
+  #roteiro{display:block;position:fixed;left:max(24px,calc(50vw - 195px - 330px));top:50%;transform:translateY(-50%);width:270px;
+    max-height:92vh;overflow:auto;color:var(--ink)}
+}
+@media (min-width:700px) and (max-width:1000px){#roteiro{display:none !important}}
+
+/* ---------- telas ---------- */
+#views{position:absolute;inset:0}
+.view{position:absolute;inset:0;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;
+  padding:calc(var(--top) + 14px) 16px calc(var(--bot) + 116px);background:var(--surface);scrollbar-width:none}
+.view::-webkit-scrollbar{display:none}
+.view.notab{padding-bottom:calc(var(--bot) + 28px)}
+.view.night{padding-bottom:calc(var(--bot) + 184px)}
+.view > *{position:relative;z-index:1}
+.view > .glow{position:absolute;z-index:0;inset:0 0 auto 0;height:620px;pointer-events:none;
+  background:radial-gradient(ellipse 340px 300px at var(--gx,85%) 120px,color-mix(in srgb,var(--glow,var(--tinta-rosa)) 26%,transparent),transparent)}
+.vblobs{position:absolute !important;z-index:0 !important;inset:0 0 auto 0;height:700px;pointer-events:none;isolation:isolate;overflow:hidden}
+.vblobs svg{position:absolute;aspect-ratio:1;mix-blend-mode:multiply;opacity:.55;overflow:visible}
+.halftone{position:absolute !important;z-index:0 !important;inset:0 0 auto 0;height:520px;pointer-events:none;
+  background:radial-gradient(var(--ht,var(--tinta-ciano)) 2.1px,transparent 2.6px) 0 0/15px 15px;
+  -webkit-mask-image:radial-gradient(circle at var(--hx,85%) var(--hy,30%),#000 0,transparent 55%);mask-image:radial-gradient(circle at var(--hx,85%) var(--hy,30%),#000 0,transparent 55%);opacity:.7}
+
+/* transições entre telas */
+.view.in-push{animation:inPush .44s var(--saida) both;z-index:3}
+.view.out-push{animation:outPush .44s var(--saida) both;z-index:2}
+.view.in-pop{animation:inPop .44s var(--saida) both;z-index:2}
+.view.out-pop{animation:outPop .44s var(--saida) both;z-index:3}
+.view.in-fade{animation:inFade .32s ease both;z-index:3}
+.view.out-fade{animation:outFade .32s ease both;z-index:2}
+.view.in-up{animation:inUp .5s var(--saida) both;z-index:3}
+.view.out-down{animation:outDown .44s var(--saida) both;z-index:3}
+@keyframes inPush{from{transform:translateX(100%)}}
+@keyframes outPush{to{transform:translateX(-28%);opacity:.3}}
+@keyframes inPop{from{transform:translateX(-28%);opacity:.3}}
+@keyframes outPop{to{transform:translateX(100%)}}
+@keyframes inFade{from{opacity:0;transform:scale(.985)}}
+@keyframes outFade{to{opacity:0}}
+@keyframes inUp{from{transform:translateY(100%)}}
+@keyframes outDown{to{transform:translateY(100%)}}
+
+/* carimbo de entrada (landing v4) */
+@keyframes carimbar{
+  0%{opacity:0;transform:scale(1.4) rotate(calc(var(--r,0deg) - 5deg))}
+  42%{opacity:1;transform:scale(.94) rotate(calc(var(--r,0deg) + 1deg))}
+  68%{transform:scale(1.03) rotate(calc(var(--r,0deg) - .5deg))}
+  100%{opacity:1;transform:scale(1) rotate(var(--r,0deg))}
+}
+@keyframes bater{
+  0%{opacity:0;transform:scale(2) rotate(calc(var(--r,0deg) - 28deg))}
+  55%{opacity:1;transform:scale(.9) rotate(calc(var(--r,0deg) + 3deg))}
+  100%{opacity:1;transform:scale(1) rotate(var(--r,0deg))}
+}
+.st{animation:carimbar .62s cubic-bezier(.3,.9,.4,1) backwards;animation-delay:calc(var(--i,0) * 70ms + 120ms);transform-origin:0 60%}
+.bate{animation:bater .5s cubic-bezier(.3,.9,.4,1) backwards;animation-delay:calc(var(--d,0) * 1ms)}
+
+/* ---------- tipografia ---------- */
+.eyebrow{font:500 12px/16px var(--font-mono);letter-spacing:.06em;text-transform:uppercase;color:var(--tinta-lima);margin-bottom:10px}
+.mono{font-family:var(--font-mono);font-weight:500;letter-spacing:.06em;text-transform:uppercase}
+.muted{color:var(--ink-muted)}
+.small{font-size:13px;line-height:18px}
+.h-xl{font:800 46px/46px var(--font-xl);letter-spacing:-.035em}
+.h-disp{font:800 32px/34px var(--font-display);letter-spacing:-.02em}
+.h-title{font:700 22px/26px var(--font-display);letter-spacing:-.01em}
+.h-sub{font:600 17px/22px var(--font-body)}
+.overprint{position:relative;isolation:isolate;display:inline-block}
+/* sem aberração cromática no texto (08/11): a personalidade vem da fonte, depois */
+.lead{font-size:17px;line-height:24px;color:var(--ink-muted)}
+.sec{margin-top:30px}
+.sec > .sh{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:12px;gap:12px}
+.sec > .sh h2{font:700 20px/24px var(--font-display);letter-spacing:-.01em}
+.sec > .sh span{font:500 11px/16px var(--font-mono);letter-spacing:.06em;text-transform:uppercase;color:var(--ink-muted)}
+.stack > * + *{margin-top:12px}
+.row-gap{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+
+/* ---------- botão: uma chapa limpa, borda áspera, mola (08/11: sem 2ª tinta) ---------- */
+.btn{--p1:var(--tinta-rosa);--rot:0deg;
+  position:relative;isolation:isolate;display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  min-height:52px;padding:0 24px;border-radius:999px;color:#fff;font:600 15px/20px var(--font-body);letter-spacing:-.01em;white-space:nowrap}
+.btn::before{content:"";position:absolute;inset:0;border-radius:inherit;z-index:-1;pointer-events:none;filter:url(#aspero);
+  background:var(--p1);transform:rotate(var(--rot));transition:transform 420ms var(--mola)}
+.btn:active,.btn.pressed{--rot:1.6deg}
+.btn.lc{--p1:var(--tinta-lima);color:#020202}
+.btn.full{width:calc(100% - 4px);margin-left:2px}
+.btn.sm{min-height:40px;padding:0 16px;font-size:14px}
+.btn.big{min-height:60px;font-size:17px}
+.btn.ghost{color:var(--ink)}
+.btn.ghost::before{background:var(--sunken);opacity:1;filter:none}
+.btn.ghost.papel{color:#020202}
+.btn.ghost.papel::before{background:rgba(2,2,2,.08)}
+.btn[disabled],.btn.off{color:var(--ink-muted);pointer-events:none}
+.btn[disabled]::before,.btn.off::before{background:var(--sunken);opacity:1}
+.btn .b-pts{font:500 12px/1 var(--font-mono);letter-spacing:.06em;opacity:.9}
+.link{font:500 14px/20px var(--font-body);color:var(--ink-muted);text-decoration:underline;text-underline-offset:3px;padding:10px 4px}
+
+/* chapa simples (landing: tabs, chips, seg) */
+.chip,.seg button,.backbtn{position:relative;isolation:isolate;border-radius:999px;padding:8px 14px;font:500 14px/18px var(--font-body);color:var(--ink);transition:color .2s}
+.chip::before,.seg button::before,.backbtn::before{content:"";position:absolute;inset:0;z-index:-1;border-radius:999px;background:var(--sunken);transition:transform 420ms var(--mola)}
+.chip:active::before,.seg button:active::before,.backbtn:active::before{transform:rotate(2deg)}
+.chip[aria-pressed="true"],.seg button[aria-pressed="true"]{color:#020202;font-weight:600}
+.chip[aria-pressed="true"]::before,.seg button[aria-pressed="true"]::before{background:var(--tinta-ciano);filter:url(#aspero);transform:rotate(-1.2deg)}
+.chip.lima[aria-pressed="true"]::before{background:var(--tinta-lima)}
+.chips{display:flex;gap:8px;overflow-x:auto;margin:0 -16px;padding:4px 16px 8px;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+.chips .chip{flex:none}
+.seg{display:inline-flex;gap:6px}
+.backbtn{padding:8px 16px 8px 12px;font-weight:600}
+.backbtn.on-poster{color:#020202}
+.backbtn.on-poster::before{background:color-mix(in srgb,var(--papel) 88%,transparent)}
+.topbar{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:18px;min-height:36px}
+
+/* tag = carimbo de texto */
+.tag{display:inline-block;position:relative;isolation:isolate;font:500 11px/1 var(--font-mono);letter-spacing:.06em;text-transform:uppercase;
+  color:var(--carimbo-azul);padding:6px 9px;transform:rotate(var(--r,-2deg));white-space:nowrap}
+.tag::before{content:"";position:absolute;inset:0;z-index:-1;border-radius:4px;background:color-mix(in srgb,var(--carimbo-azul) 24%,var(--sunken));filter:url(#aspero)}
+.tag.pat{color:#020202}.tag.pat::before{background:var(--papel)}
+.tag.lima{color:#020202}.tag.lima::before{background:var(--tinta-lima)}
+.tag.rosa{color:#020202}.tag.rosa::before{background:var(--tinta-rosa)}
+.tag.lar{color:#020202}.tag.lar::before{background:var(--tinta-laranja)}
+.tag.cin{color:var(--ink-muted)}.tag.cin::before{background:var(--sunken)}
+.tag.verm{color:var(--c-verm)}.tag.verm::before{background:color-mix(in srgb,var(--c-verm) 22%,var(--sunken))}
+.tag.onp{color:var(--p-azul)}.tag.onp::before{background:transparent;border:1.5px solid currentColor}
+
+/* cartão */
+.card{position:relative;isolation:isolate;padding:18px}
+.card::before{content:"";position:absolute;inset:0;z-index:-1;border-radius:24px;background:var(--raised)}
+.card.sunk::before{background:var(--sunken)}
+.card.rough::before{filter:url(#aspero-lg)}
+.card.papel{color:var(--on-papel)}
+.card.papel::before{background:var(--papel);border-radius:14px}
+
+/* ---------- tab bar ---------- */
+.tabbar{position:absolute;z-index:40;left:10px;right:10px;bottom:calc(var(--bot) + 6px);height:64px;display:grid;grid-template-columns:1fr 1fr 82px 1fr 1fr;align-items:center;
+  border-radius:999px;background:color-mix(in srgb,var(--raised) 84%,transparent);-webkit-backdrop-filter:blur(18px) saturate(1.3);backdrop-filter:blur(18px) saturate(1.3);
+  transition:transform .4s var(--saida),opacity .3s}
+.tabbar.hide{transform:translateY(140%);opacity:0;pointer-events:none}
+.tab{position:relative;isolation:isolate;height:40px;margin:0 3px;border-radius:999px;font:500 12px/1 var(--font-body);color:var(--ink-muted);letter-spacing:-.01em}
+.tab::before{content:"";position:absolute;inset:0;z-index:-1;border-radius:999px;transform:rotate(0);transition:transform 420ms var(--mola),background .2s}
+.tab[aria-selected="true"]{color:#020202;font-weight:650}
+.tab[aria-selected="true"]::before{background:var(--tinta-lima);filter:url(#aspero);transform:rotate(-1.6deg)}
+.tab:active::before{transform:rotate(2deg)}
+.tab-ck{--rot:0deg;position:relative;isolation:isolate;width:76px;height:76px;margin:-22px auto 0;border-radius:50%;color:#fff;font:800 14px/1 var(--font-display);letter-spacing:-.01em}
+.tab-ck::before{content:"";position:absolute;inset:0;border-radius:50%;z-index:-1;filter:url(#aspero-lg);
+  background:var(--tinta-rosa);transform:rotate(var(--rot));transition:transform 420ms var(--mola)}
+.tab-ck:active{--rot:4deg}
+.tab-ck.on{--p:1}
+.tab-ck small{display:block;font:500 9.5px/1 var(--font-mono);letter-spacing:.08em;margin-top:4px;opacity:.9}
+/* ícones da tab bar (versão B, com tinta — escolhida em 08/11) */
+.tab{height:48px;display:flex;align-items:center;justify-content:center}
+.tab .ic{width:30px;height:30px;overflow:visible}
+.tab-ck{display:flex;align-items:center;justify-content:center}
+.tab-ck .ic{width:40px;height:40px;overflow:visible}
+
+/* noite ativa: comanda fixa acima da tab bar */
+.nightbar{position:absolute;z-index:39;left:14px;right:14px;bottom:calc(var(--bot) + 80px);min-height:62px;display:flex;align-items:center;gap:12px;padding:10px 16px 10px 14px;color:#020202;text-align:left;
+  isolation:isolate;transform:rotate(-.6deg);transition:transform .45s var(--mola),opacity .3s}
+.nightbar::before{content:"";position:absolute;inset:0;z-index:-1;border-radius:16px;background:var(--tinta-laranja);filter:url(#aspero-lg)}
+.nightbar::after{content:"";position:absolute;inset:0;z-index:-1;border-radius:16px;pointer-events:none;
+  background:radial-gradient(rgba(2,2,2,.22) 1.2px,transparent 1.6px) 0 0/7px 7px;-webkit-mask-image:linear-gradient(100deg,transparent 55%,#000);mask-image:linear-gradient(100deg,transparent 55%,#000)}
+.nightbar.hide{transform:translateY(240%) rotate(-.6deg);opacity:0;pointer-events:none}
+.nightbar .nb-dot{width:10px;height:10px;border-radius:50%;background:#020202;flex:none;animation:pulso 1.6s ease-in-out infinite}
+@keyframes pulso{50%{transform:scale(.55);opacity:.5}}
+.nightbar b{display:block;font:800 17px/20px var(--font-xl);letter-spacing:-.01em}
+.nightbar span{font:500 11px/14px var(--font-mono);letter-spacing:.06em;text-transform:uppercase}
+.nightbar .nb-go{margin-left:auto;font:600 13px/1 var(--font-body);padding:9px 12px;border-radius:999px;background:rgba(2,2,2,.12)}
+
+/* ---------- cartaz do evento (duas tintas) ---------- */
+.poster{position:relative;isolation:isolate;height:var(--h,168px);color:#020202;padding:14px 16px;display:flex;flex-direction:column;justify-content:space-between}
+.poster::before{content:"";position:absolute;inset:0;z-index:-3;border-radius:20px;background:var(--i1);filter:url(#aspero-lg)}
+.poster .pb{position:absolute;z-index:-2;mix-blend-mode:multiply;opacity:var(--tinta-opacidade);overflow:visible}
+.poster .ht{position:absolute;z-index:-1;inset:0;border-radius:20px;background:radial-gradient(rgba(2,2,2,.22) 1.4px,transparent 1.8px) 0 0/8px 8px;
+  -webkit-mask-image:radial-gradient(circle at 10% 100%,#000,transparent 60%);mask-image:radial-gradient(circle at 10% 100%,#000,transparent 60%)}
+.poster .p-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;font:500 11.5px/16px var(--font-mono);letter-spacing:.07em;text-transform:uppercase}
+.poster .p-t{font:800 32px/31px var(--font-xl);letter-spacing:-.03em;max-width:85%}
+.poster .p-t.l{font-size:42px;line-height:40px}
+.poster .reg{position:absolute;width:14px;height:14px;border:1.5px solid rgba(2,2,2,.5);border-radius:50%;right:14px;bottom:14px}
+.poster .reg::before,.poster .reg::after{content:"";position:absolute;background:rgba(2,2,2,.5)}
+.poster .reg::before{left:50%;top:-5px;bottom:-5px;width:1.5px;margin-left:-.75px}
+.poster .reg::after{top:50%;left:-5px;right:-5px;height:1.5px;margin-top:-.75px}
+.poster.nopromo::before{background:var(--sunken)}
+.poster.nopromo{color:var(--ink)}
+
+.ecard{display:block;width:100%;text-align:left}
+.ecard + .ecard{margin-top:22px}
+.ecard .e-body{padding:12px 4px 0}
+.ecard .e-name{font:700 19px/24px var(--font-display);letter-spacing:-.01em}
+.ecard .e-meta{margin-top:2px;color:var(--ink-muted);font-size:14px}
+.ecard .row-gap{margin-top:10px}
+.ecard:active .poster{transform:scale(.985)}
+.ecard .poster{transition:transform .3s var(--mola)}
+
+/* ---------- ingresso / benefício (landing v4) ---------- */
+.ticket{--stub:62px;--ink-c:var(--tinta-ciano);position:relative;isolation:isolate;display:grid;grid-template-columns:1fr var(--stub);width:100%;min-height:132px;color:#020202;text-align:left;
+  transform:rotate(var(--r,0deg));transition:transform 420ms var(--mola)}
+.ticket:active{transform:rotate(0deg) scale(.985)}
+.ticket::before{content:"";position:absolute;inset:0;z-index:-1;border-radius:12px;background:var(--ink-c);
+  -webkit-mask-image:radial-gradient(circle 10px at calc(100% - var(--stub)) 0,transparent 97%,#000),radial-gradient(circle 10px at calc(100% - var(--stub)) 100%,transparent 97%,#000);
+  -webkit-mask-composite:source-in;mask-image:radial-gradient(circle 10px at calc(100% - var(--stub)) 0,transparent 97%,#000),radial-gradient(circle 10px at calc(100% - var(--stub)) 100%,transparent 97%,#000);mask-composite:intersect;
+  filter:url(#aspero-lg)}
+.ticket::after{content:"";position:absolute;inset:0;z-index:-1;border-radius:12px;pointer-events:none;
+  background:radial-gradient(rgba(2,2,2,.2) 1.3px,transparent 1.7px) 0 0/8px 8px;-webkit-mask-image:linear-gradient(135deg,#000,transparent 50%);mask-image:linear-gradient(135deg,#000,transparent 50%)}
+.t-ciano{--ink-c:var(--tinta-ciano)}.t-rosa{--ink-c:var(--tinta-rosa)}.t-lima{--ink-c:var(--tinta-lima)}.t-laranja{--ink-c:var(--tinta-laranja)}.t-papel{--ink-c:var(--papel)}
+.ticket.locked{--ink-c:var(--sunken);color:var(--ink-muted)}
+.ticket.locked .tk-stub{border-left-color:var(--hairline)}
+.ticket.locked .tk-bar{opacity:.25;filter:invert(1)}
+.tk-main{padding:14px 14px 16px 16px;min-width:0}
+.tk-top{display:flex;justify-content:space-between;gap:8px;font:500 11px/14px var(--font-mono);letter-spacing:.07em;text-transform:uppercase;margin-bottom:10px}
+.tk-top span:last-child{opacity:.75;text-align:right}
+.ticket h3{font:800 22px/23px var(--font-xl);letter-spacing:-.02em;margin-bottom:6px}
+.ticket p{font-size:14px;line-height:19px}
+.tk-big{font:500 18px/1 var(--font-mono);margin:8px 0 2px;letter-spacing:.02em}
+.tk-stub{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;border-left:2px dashed rgba(2,2,2,.45);margin:12px 0}
+.tk-bar{display:block;width:28px;height:70px;background:repeating-linear-gradient(0deg,#020202 0 2px,transparent 2px 4px,#020202 4px 5px,transparent 5px 8px,#020202 8px 11px,transparent 11px 13px,#020202 13px 14px,transparent 14px 17px)}
+.tk-code{font:500 10.5px/1 var(--font-mono);letter-spacing:.08em;writing-mode:vertical-rl;transform:rotate(180deg);opacity:.8}
+.tk-price{display:inline-block;margin-top:10px;font:500 12px/1 var(--font-mono);letter-spacing:.06em;padding:6px 9px;border-radius:999px;background:rgba(2,2,2,.12)}
+.tk-price.falta{background:transparent;border:1.5px dashed currentColor}
+.tk-novo{position:absolute;right:calc(var(--stub) - 22px);top:-12px;z-index:2}
+.tk-seal{position:absolute;z-index:3;right:72px;top:50%;width:104px;height:104px;margin-top:-52px;pointer-events:none;mix-blend-mode:multiply}
+.ticket.locked .tk-seal{mix-blend-mode:normal}
+.tickets > * + *{margin-top:16px}
+
+/* ---------- passaporte ---------- */
+.book{position:relative;isolation:isolate;color:var(--on-papel);background:var(--papel);border-radius:16px;overflow:hidden;transform:rotate(-.6deg);transform-origin:50% 50%}
+.book::before{content:"";position:absolute;inset:0;pointer-events:none;z-index:0;
+  background:repeating-radial-gradient(circle at 50% 135%,transparent 0 9px,rgba(8,10,160,.065) 9px 10px)}
+.book > *{position:relative;z-index:1}
+.pp-head{display:flex;justify-content:space-between;font:500 11.5px/16px var(--font-mono);letter-spacing:.1em;color:#695f5a;border-bottom:1.5px solid rgba(2,2,2,.2);padding:16px 18px 10px;margin:0}
+.pp-page{padding:16px 16px 14px;perspective:900px}
+.pp-flip{transform-origin:0 50%;transition:transform .5s var(--saida),opacity .5s}
+.pp-flip.turn-l{animation:virar .55s var(--saida) both}
+.pp-flip.turn-r{animation:desvirar .55s var(--saida) both}
+@keyframes virar{0%{transform:rotateY(-70deg);opacity:0}100%{transform:none;opacity:1}}
+@keyframes desvirar{0%{transform:rotateY(70deg);opacity:0;transform-origin:100% 50%}100%{transform:none;opacity:1}}
+.slots{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.slots.c4{grid-template-columns:repeat(4,1fr)}
+.slot{position:relative;aspect-ratio:1;display:grid;place-items:center}
+.slot.empty::before{content:"";position:absolute;inset:6%;border:1.5px dashed rgba(2,2,2,.22);border-radius:50%}
+.slot.empty span{font:500 11px/1 var(--font-mono);letter-spacing:.08em;color:rgba(2,2,2,.38)}
+.slot.next::before{border-color:var(--p-rosa);border-width:2px;animation:pulsoSlot 1.4s ease-in-out infinite}
+.slot.next span{color:var(--p-rosa)}
+@keyframes pulsoSlot{50%{transform:scale(.92);opacity:.55}}
+.slot .stampsvg{position:absolute;inset:-4%;width:108%;height:108%}
+.stampsvg{mix-blend-mode:multiply;overflow:visible;display:block}
+.stampsvg text{font-family:var(--font-mono);font-weight:500;fill:currentColor;text-anchor:middle}
+.pp-foot{padding:4px 18px 14px;font-size:14px;line-height:19px}
+.pp-mrz{font:500 11px/1.5 var(--font-mono);letter-spacing:.16em;color:rgba(2,2,2,.55);padding:10px 18px 14px;background:rgba(2,2,2,.05);overflow:hidden;white-space:nowrap}
+.pp-lock{position:absolute;inset:0;display:grid;place-items:center;z-index:3;text-align:center;padding:20px}
+.pp-lock b{display:block;font:800 22px/24px var(--font-xl);letter-spacing:-.02em}
+.pp-dim .slots{opacity:.35}
+.pager{display:flex;justify-content:space-between;align-items:center;margin-top:14px}
+.pager .mono{font-size:11px;color:var(--ink-muted)}
+
+/* régua de níveis */
+.regua{position:relative;padding:4px 0 0}
+.regua .trilho{position:absolute;left:14px;right:14px;top:18px;height:4px;border-radius:2px;background:var(--sunken)}
+.regua .fill{position:absolute;left:14px;top:18px;height:4px;border-radius:2px;background:var(--tinta-lima);filter:url(#aspero)}
+.regua ol{position:relative;list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.regua li{display:flex;flex-direction:column;align-items:center;text-align:center;gap:8px}
+.regua .n{width:32px;height:32px;border-radius:50%;display:grid;place-items:center;font:500 13px/1 var(--font-mono);background:var(--sunken);color:var(--ink)}
+.regua li.ok .n{background:var(--tinta-lima);color:#020202}
+.regua li.cur .n{box-shadow:0 0 0 2px var(--tinta-lima)}
+.regua small{font-size:12px;line-height:15px;color:var(--ink-muted)}
+.regua li.ok small{color:var(--ink)}
+.regua em{font:500 10px/1 var(--font-mono);letter-spacing:.06em;font-style:normal;color:var(--tinta-lima)}
+
+.oldbooks{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+.oldbook{position:relative;aspect-ratio:.72;border-radius:8px 12px 12px 8px;color:#020202;padding:12px 10px;text-align:left;display:flex;flex-direction:column;justify-content:space-between;isolation:isolate;transform:rotate(var(--r,0deg));transition:transform .42s var(--mola)}
+.oldbook:active{transform:rotate(0) scale(.96)}
+.oldbook::before{content:"";position:absolute;inset:0;z-index:-1;border-radius:inherit;background:var(--c);filter:url(#aspero-lg)}
+.oldbook::after{content:"";position:absolute;left:8px;top:0;bottom:0;width:2px;background:rgba(2,2,2,.25)}
+.oldbook b{font:800 18px/19px var(--font-xl);letter-spacing:-.02em;padding-left:6px}
+.oldbook span{font:500 10px/13px var(--font-mono);letter-spacing:.06em;padding-left:6px}
+.oldbook.wr{--c:var(--sunken);color:var(--ink-muted)}
+
+/* barra de progresso de tinta */
+.bar{position:relative;height:10px;border-radius:999px;background:var(--sunken);overflow:visible}
+.bar i{position:absolute;left:0;top:0;bottom:0;border-radius:999px;background:var(--tinta-lima);filter:url(#aspero);transition:width .8s var(--saida)}
+.dots{display:flex;gap:8px}
+.dots i{width:26px;height:26px;border-radius:50%;border:1.5px dashed var(--border-control)}
+.dots i.on{border:0;background:var(--tinta-rosa);filter:url(#aspero)}
+
+/* saldo */
+.saldo{display:flex;align-items:flex-end;gap:10px}
+.saldo .num{font:800 72px/62px var(--font-xl);letter-spacing:-.04em}
+.saldo .lbl{font:500 12px/16px var(--font-mono);letter-spacing:.06em;text-transform:uppercase;color:var(--ink-muted);padding-bottom:6px}
+.ganhos{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:14px}
+.ganhos div{padding:9px 6px;border-radius:12px;background:var(--sunken);text-align:center}
+.ganhos b{display:block;font:500 15px/1 var(--font-mono);color:var(--tinta-lima)}
+.ganhos span{font-size:11px;line-height:14px;color:var(--ink-muted)}
+
+/* listas */
+.list{border-radius:20px;background:var(--raised);overflow:hidden}
+.li{display:flex;align-items:center;gap:12px;width:100%;min-height:58px;padding:12px 16px;text-align:left;font-size:16px}
+.li + .li{border-top:1px solid var(--hairline)}
+.li:active{background:var(--sunken)}
+.li .go{margin-left:auto;font:500 12px/1 var(--font-mono);letter-spacing:.06em;color:var(--ink-muted)}
+.li .sub{display:block;font-size:13px;line-height:17px;color:var(--ink-muted)}
+.kv{display:flex;justify-content:space-between;gap:16px;padding:11px 0;border-top:1px solid rgba(2,2,2,.14);font-size:15px}
+.kv:first-child{border-top:0}
+.kv span:first-child{color:#695f5a}
+.kv.dark{border-top-color:var(--hairline)}
+.kv.dark span:first-child{color:var(--ink-muted)}
+.kv.total{font-weight:700;font-size:17px}
+
+/* stats do evento */
+.stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.stat{padding:12px 12px 14px;border-radius:16px;background:var(--raised)}
+.stat .mono{display:block;font-size:10px;line-height:13px;color:var(--ink-muted);margin-bottom:6px}
+.stat b{font:700 18px/22px var(--font-display)}
+.lota{display:flex;gap:3px;margin-top:8px}
+.lota i{flex:1;height:5px;border-radius:2px;background:var(--sunken)}
+.lota i.on{background:var(--tinta-laranja)}
+
+/* quem vai */
+.faces{display:flex;align-items:center}
+.faces svg{width:44px;height:44px;margin-right:-10px;overflow:visible}
+.faces .mais{margin-left:18px;font:500 12px/1 var(--font-mono);letter-spacing:.06em;color:var(--ink-muted)}
+
+/* reviews */
+.rev{padding:16px 0;border-top:1px solid var(--hairline)}
+.rev:first-child{border-top:0;padding-top:4px}
+.rev .rh{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.rev .rh svg{width:30px;height:30px;flex:none;overflow:visible}
+.rev .rh b{font-weight:600}
+.rev .rh .mono{font-size:11px;color:var(--ink-muted);margin-left:auto}
+.rev p{color:var(--ink)}
+.rev.mine{margin:0 -12px;padding:14px 12px;border-radius:16px;background:color-mix(in srgb,var(--tinta-lima) 12%,var(--raised))}
+.ajudou{margin-top:10px;display:inline-flex;align-items:center;gap:8px;padding:7px 12px;border-radius:999px;border:1.5px solid var(--border-control);font:500 13px/1 var(--font-body);color:var(--ink);transition:transform .42s var(--mola)}
+.ajudou b{font:500 12px/1 var(--font-mono)}
+.ajudou[aria-pressed="true"]{background:var(--tinta-lima);border-color:var(--tinta-lima);color:#020202;transform:rotate(-2deg)}
+.ajudou:active{transform:scale(.94)}
+
+/* barra de ação fixa no rodapé */
+.view.flush{padding-bottom:0}
+.actionbar{position:sticky;z-index:38;bottom:0;margin:0 -16px;padding:22px 16px calc(var(--bot) + 10px);display:flex;gap:10px;
+  background:linear-gradient(transparent,var(--surface) 30%)}
+.actionbar .btn{flex:1}
+.actionbar .btn.ghost{flex:0 0 auto}
+
+/* mapa */
+.map{position:relative;border-radius:24px;overflow:hidden;background:var(--raised);height:440px}
+.map svg{width:100%;height:100%;display:block}
+.map .pin{cursor:pointer}
+.map text{font-family:var(--font-mono);font-weight:500;text-anchor:middle}
+.map .bairro{font-size:9.5px;letter-spacing:1.4px;fill:var(--ink-muted);opacity:.7}
+.map .plbl{font-size:10.5px;letter-spacing:.4px;fill:var(--ink);paint-order:stroke;stroke:var(--raised);stroke-width:5px;stroke-linejoin:round}
+.map .plbl.nop{fill:var(--ink-muted)}
+.map .vc{animation:pulsoMapa 2s ease-out infinite;transform-origin:center;transform-box:fill-box}
+@keyframes pulsoMapa{0%{transform:scale(.4);opacity:.9}100%{transform:scale(2.4);opacity:0}}
+.mapcard{position:absolute;left:10px;right:10px;bottom:10px}
+
+/* sheet */
+#sheet{position:absolute;inset:0;z-index:80;pointer-events:none}
+#sheet .scrim{position:absolute;inset:0;background:rgba(2,2,2,.6);opacity:0;transition:opacity .3s}
+#sheet .panel{position:absolute;left:0;right:0;bottom:0;max-height:88%;overflow:auto;padding:10px 20px calc(var(--bot) + 18px);background:var(--raised);border-radius:28px 28px 0 0;
+  transform:translateY(105%);transition:transform .46s var(--saida)}
+#sheet .panel::before{content:"";display:block;width:38px;height:5px;border-radius:3px;background:var(--sunken);margin:0 auto 18px}
+#sheet.open{pointer-events:auto}
+#sheet.open .scrim{opacity:1}
+#sheet.open .panel{transform:none}
+#sheet.alert .panel{left:50%;right:auto;bottom:50%;width:276px;margin-left:-138px;border-radius:16px;padding:0;text-align:center;
+  background:color-mix(in srgb,#2c2833 92%,transparent);-webkit-backdrop-filter:blur(30px);backdrop-filter:blur(30px);transform:translateY(50%) scale(1.12);opacity:0;transition:transform .3s var(--saida),opacity .2s}
+#sheet.alert .panel::before{display:none}
+#sheet.alert.open .panel{transform:translateY(50%);opacity:1}
+.ios-a{padding:20px 16px 16px}
+.ios-a b{display:block;font:600 17px/22px var(--font-body);margin-bottom:4px}
+.ios-a p{font-size:13px;line-height:17px}
+.ios-b{display:block;width:100%;padding:12px;border-top:.5px solid rgba(255,255,255,.18);color:#0a84ff;font-size:17px;line-height:22px}
+.ios-b.strong{font-weight:600}
+.ios-map{height:120px;margin:12px 16px 4px;border-radius:10px;overflow:hidden;background:#3a3440}
+.sh-t{font:800 26px/28px var(--font-xl);letter-spacing:-.02em;margin-bottom:8px}
+
+/* toast = carimbo de pontos */
+#toast{position:absolute;z-index:90;left:50%;top:calc(var(--top) + 10px);transform:translateX(-50%);pointer-events:none}
+.toast{--r:-3deg;position:relative;isolation:isolate;display:flex;align-items:center;gap:10px;padding:10px 16px;color:#020202;font:600 14px/18px var(--font-body);white-space:nowrap;
+  animation:bater .5s cubic-bezier(.3,.9,.4,1) both}
+.toast::before{content:"";position:absolute;inset:0;z-index:-1;border-radius:12px;background:var(--papel);filter:url(#aspero)}
+.toast b{font:500 13px/1 var(--font-mono);letter-spacing:.06em;color:var(--p-rosa);border:2px solid currentColor;border-radius:6px;padding:5px 7px}
+.toast.out{animation:sumir .35s ease forwards}
+@keyframes sumir{to{opacity:0;transform:translateY(-14px) rotate(-3deg)}}
+
+/* tela de bloqueio (notificação do dia seguinte) */
+#lock{position:absolute;inset:0;z-index:85;display:none;flex-direction:column;align-items:center;padding:calc(var(--top) + 40px) 12px 0;background:#0c0a10;overflow:hidden;isolation:isolate}
+#lock.open{display:flex;animation:inFade .6s ease both}
+#lock .wall{position:absolute;inset:-20%;z-index:-1;filter:blur(30px);opacity:.75}
+#lock .ld{font:600 19px/24px var(--font-display);opacity:.85}
+#lock .lt{font:700 92px/96px var(--font-display);letter-spacing:-.02em;margin-bottom:36px}
+.notif{display:flex;gap:12px;width:100%;padding:14px;border-radius:24px;text-align:left;background:color-mix(in srgb,#3a3440 62%,transparent);-webkit-backdrop-filter:blur(24px);backdrop-filter:blur(24px);
+  animation:notifIn .6s var(--mola) .9s both}
+@keyframes notifIn{from{transform:translateY(-30px) scale(.94);opacity:0}}
+.notif svg{width:42px;height:42px;flex:none;overflow:visible}
+.notif .nh{display:flex;justify-content:space-between;font:600 13px/17px var(--font-body);opacity:.75;margin-bottom:2px}
+.notif b{display:block;font:600 15px/20px var(--font-body)}
+.notif p{font-size:15px;line-height:20px}
+#lock .lhint{position:absolute;bottom:calc(var(--bot) + 30px);font:500 11px/1 var(--font-mono);letter-spacing:.08em;text-transform:uppercase;opacity:.55}
+
+/* check-in: confirmando local */
+.radar{position:relative;width:240px;height:240px;margin:40px auto 0}
+.radar i{position:absolute;inset:0;border-radius:50%;border:2px solid var(--tinta-rosa);animation:radar 2.2s ease-out infinite;opacity:0}
+.radar i:nth-child(2){animation-delay:.7s;border-color:var(--tinta-ciano)}
+.radar i:nth-child(3){animation-delay:1.4s;border-color:var(--tinta-lima)}
+@keyframes radar{0%{transform:scale(.2);opacity:1}100%{transform:scale(1.1);opacity:0}}
+.radar .core{position:absolute;left:50%;top:50%;width:84px;height:84px;margin:-42px 0 0 -42px}
+
+/* carimbar */
+.stampstage{position:relative;margin-top:24px}
+.stampstage .book{transform:rotate(-1deg)}
+.stampstage.thud .book{animation:baque .4s var(--saida)}
+@keyframes baque{0%{transform:rotate(-1deg) scale(1)}30%{transform:rotate(-1deg) scale(.975,.96)}100%{transform:rotate(-1deg) scale(1)}}
+.respingo{position:absolute;pointer-events:none;mix-blend-mode:multiply;overflow:visible;animation:respingo .5s var(--saida) both}
+@keyframes respingo{0%{transform:scale(0) translate(0,0);opacity:0}40%{opacity:.95}100%{transform:scale(1) translate(var(--dx),var(--dy));opacity:.85}}
+.slot .bate-in{animation:bater .46s cubic-bezier(.3,.9,.4,1) both}
+.slot .vazar{animation:vazar .9s ease-out .15s both}
+@keyframes vazar{from{filter:blur(1.4px);opacity:.75}to{filter:none;opacity:1}}
+.holdbtn{position:relative;overflow:visible}
+.holdbtn .carga{position:absolute;inset:0;border-radius:999px;z-index:-1;pointer-events:none;overflow:hidden}
+.holdbtn .carga i{position:absolute;left:0;top:0;bottom:0;width:0;background:rgba(2,2,2,.32)}
+.holdbtn.holding .carga i{width:100%;transition:width .7s linear}
+.holdbtn.holding{transform:scale(.97);transition:transform .2s}
+.flutua{position:absolute;z-index:4;pointer-events:none;transition:transform .7s var(--saida),opacity .3s}
+
+/* avatar */
+.avatar{overflow:visible;display:block}
+.av-bob{animation:bob 3.4s ease-in-out infinite}
+@keyframes bob{50%{transform:translateY(-5px) rotate(1.5deg)}}
+.avpick{display:flex;gap:12px;justify-content:center}
+.avpick button{width:52px;height:52px;border-radius:50%;position:relative;isolation:isolate}
+.avpick button::before{content:"";position:absolute;inset:0;border-radius:50%;background:var(--c);filter:url(#aspero)}
+.avpick button[aria-pressed="true"]{box-shadow:0 0 0 3px var(--surface),0 0 0 5px var(--ink)}
+
+/* formulários */
+.field{display:block;width:100%;min-height:54px;padding:14px 16px;border-radius:14px;border:1.5px solid var(--border-control);background:var(--sunken);color:var(--ink);outline:none}
+.field:focus{border-color:var(--focus)}
+textarea.field{min-height:130px;resize:none;line-height:22px}
+.field.mono{font-family:var(--font-mono);letter-spacing:.12em;text-transform:uppercase}
+.q{margin-top:22px}
+.q .mono{font-size:11px;color:var(--ink-muted);margin-bottom:10px;display:flex;justify-content:space-between}
+.q .opts{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.q .opts .chip{padding:14px 10px;font-size:15px;text-align:center}
+
+/* interruptor */
+.sw{position:relative;width:51px;height:31px;flex:none;border-radius:999px;background:var(--sunken);transition:background .2s;isolation:isolate}
+.sw::before{content:"";position:absolute;inset:0;border-radius:inherit;background:var(--tinta-lima);filter:url(#aspero);opacity:0;transition:opacity .2s;z-index:-1}
+.sw::after{content:"";position:absolute;top:3px;left:3px;width:25px;height:25px;border-radius:50%;background:var(--ink);transition:transform .42s var(--mola)}
+.sw[aria-checked="true"]::before{opacity:1}
+.sw[aria-checked="true"]::after{transform:translateX(20px);background:#020202}
+
+/* cartão virtual e fidelidade */
+.vcard{position:relative;isolation:isolate;aspect-ratio:1.586;border-radius:18px;color:#020202;padding:18px 20px;display:flex;flex-direction:column;justify-content:space-between;overflow:hidden;
+  background:var(--papel);transform:rotate(-1.2deg);transition:transform .7s var(--mola)}
+.vcard .pb{position:absolute;z-index:-1;mix-blend-mode:multiply;opacity:var(--tinta-opacidade)}
+.vcard .vc-top{display:flex;justify-content:space-between;font:500 11px/14px var(--font-mono);letter-spacing:.1em}
+.vcard .vc-n{font:500 20px/1 var(--font-mono);letter-spacing:.14em}
+.vcard .vc-brand{font:800 26px/1 var(--font-xl);letter-spacing:-.02em}
+.vcard.lift{transform:rotate(0) translateY(-10px) scale(1.02)}
+.vcard .pago{position:absolute;right:16px;top:44px;width:140px;color:var(--p-azul)}
+.nfc{position:absolute;left:50%;top:50%;width:80px;height:80px;margin:-40px;border-radius:50%;border:2px solid var(--p-azul);opacity:0;pointer-events:none}
+.vcard.lift .nfc{animation:radar 1.1s ease-out 2}
+.fid{color:#020202}
+.fid .fd{display:flex;gap:8px;margin-top:12px}
+.fid .fd i{flex:1;aspect-ratio:1;border-radius:50%;border:1.5px dashed rgba(2,2,2,.3);position:relative}
+.fid .fd i.on{border:0}
+.fid .fd i.on svg{position:absolute;inset:-8%;width:116%;height:116%}
+
+/* contatos */
+.ct{display:flex;align-items:center;gap:12px;width:100%;padding:10px 0;text-align:left}
+.ct + .ct{border-top:1px solid var(--hairline)}
+.ct svg{width:38px;height:38px;flex:none;overflow:visible}
+.ct .ck{margin-left:auto;width:26px;height:26px;border-radius:50%;border:1.5px solid var(--border-control);position:relative}
+.ct[aria-pressed="true"] .ck{border:0;background:var(--tinta-lima);filter:url(#aspero)}
+.ct[aria-pressed="true"] .ck::after{content:"";position:absolute;left:9px;top:5px;width:6px;height:11px;border:solid #020202;border-width:0 2.5px 2.5px 0;transform:rotate(45deg)}
+
+/* abertura */
+.abertura{display:flex;flex-direction:column;min-height:100%;padding-top:150px}
+.abertura .hero-t{font:800 92px/86px var(--font-xl);letter-spacing:-.045em;margin-top:auto}
+.hero-stamp{position:absolute !important;right:6px;top:calc(var(--top) + 96px);display:flex;flex-direction:column;align-items:center;gap:4px;padding:12px 18px;color:var(--c-rosa);font-family:var(--font-mono);text-transform:uppercase;pointer-events:none}
+.hero-stamp::before{content:"";position:absolute;inset:0;border:3px double currentColor;border-radius:6px;filter:url(#aspero)}
+.hero-stamp b{font-size:24px;font-weight:500;letter-spacing:.06em}
+.hero-stamp span{font-size:13px;letter-spacing:.08em}
+
+/* painel de estados (roteiro) */
+.rt h2{font:800 22px/24px var(--font-xl);letter-spacing:-.02em;margin-bottom:4px}
+.rt p{font-size:13px;line-height:18px;color:var(--ink-muted);margin-bottom:14px}
+.rt h3{font:500 11px/16px var(--font-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--tinta-lima);margin:18px 0 8px}
+.rt .rb{display:flex;align-items:baseline;gap:10px;width:100%;padding:8px 10px;border-radius:10px;text-align:left;font-size:14px;line-height:18px}
+.rt .rb:hover,.rt .rb:active{background:var(--raised)}
+.rt .rb i{font:500 11px/1 var(--font-mono);font-style:normal;color:var(--ink-muted);width:22px;flex:none}
+.rt .foot{margin-top:16px;font-size:12px;line-height:16px;color:var(--ink-muted)}
+
+.center{text-align:center}
+.mt8{margin-top:8px}.mt12{margin-top:12px}.mt16{margin-top:16px}.mt24{margin-top:24px}.mt32{margin-top:32px}
+.flexcol{display:flex;flex-direction:column;gap:10px}
+
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:1ms !important;animation-iteration-count:1 !important;transition-duration:1ms !important}
+}
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <!-- borda áspera de botões e etiquetas -->
+    <filter id="aspero" x="-15%" y="-60%" width="130%" height="220%">
+      <feTurbulence type="fractalNoise" baseFrequency=".06" numOctaves="3" seed="3" result="r"/>
+      <feDisplacementMap in="SourceGraphic" in2="r" scale="5" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+    <!-- borda áspera de cartões e painéis grandes -->
+    <filter id="aspero-lg" x="-4%" y="-4%" width="108%" height="108%">
+      <feTurbulence type="fractalNoise" baseFrequency=".035" numOctaves="3" seed="9" result="r"/>
+      <feDisplacementMap in="SourceGraphic" in2="r" scale="8" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+    <!-- fibra de tinta nos blobs -->
+    <filter id="fibra" x="-10%" y="-10%" width="120%" height="120%">
+      <feTurbulence type="fractalNoise" baseFrequency=".8" numOctaves="2" seed="11" result="f"/>
+      <feDisplacementMap in="SourceGraphic" in2="f" scale="3.5" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+    <!-- carimbo: traço tremido com falhas de tinta (experimento xc-stamp) -->
+    <!-- tinta nos ícones da tab bar: parente do #aspero, calibrado para 24px -->
+    <filter id="tinta-icone" x="-20%" y="-20%" width="140%" height="140%">
+      <feTurbulence type="fractalNoise" baseFrequency=".45" numOctaves="2" seed="7" result="r"/>
+      <feDisplacementMap in="SourceGraphic" in2="r" scale="1.6" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+    <filter id="carimbo" x="-10%" y="-10%" width="120%" height="120%">
+      <feTurbulence type="fractalNoise" baseFrequency=".06" numOctaves="2" seed="9" result="w"/>
+      <feDisplacementMap in="SourceGraphic" in2="w" scale="3" xChannelSelector="R" yChannelSelector="G" result="d"/>
+      <feTurbulence type="fractalNoise" baseFrequency=".45" numOctaves="2" seed="3" result="n"/>
+      <feColorMatrix in="n" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 -10 6" result="m"/>
+      <feComposite in="d" in2="m" operator="in"/>
+    </filter>
+  </defs>
+</svg>
+
+<aside id="roteiro" class="rt" aria-label="Roteiro do protótipo"></aside>
+
+<div id="device">
+  <div class="fake-status" aria-hidden="true"><span id="clock">23:40</span><small>5G&nbsp;&nbsp;82%</small></div>
+  <div id="views"></div>
+  <button class="nightbar hide" id="nightbar" type="button" data-go="noite"></button>
+  <nav class="tabbar hide" id="tabbar" aria-label="Abas">
+    <!-- ícones provisórios no estilo SF Symbols (safari, book.closed, checkmark.seal, gift, person.crop.circle): trocar pelos SVGs exportados do app SF Symbols -->
+    <button class="tab" type="button" data-tab="explorar" aria-selected="false" aria-label="Explorar"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" filter="url(#tinta-icone)"><circle cx="12" cy="12" r="9.2"/><path d="M15.6 8.4l-2.1 5.1-5.1 2.1 2.1-5.1z" fill="currentColor" stroke-linejoin="round"/></g></svg></button>
+    <button class="tab" type="button" data-tab="passaporte" aria-selected="false" aria-label="Passaporte"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" filter="url(#tinta-icone)"><path d="M6.5 3.5h11a1 1 0 0 1 1 1v15a1 1 0 0 1-1 1h-11a2 2 0 0 1-2-2v-13a2 2 0 0 1 2-2z"/><path d="M8.5 3.5v17"/><circle cx="13.5" cy="10.5" r="2.4"/></g></svg></button>
+    <button class="tab-ck" type="button" data-act="checkin" id="tabck" aria-label="Check-in"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" filter="url(#tinta-icone)"><path d="M12 2.8l2.2 1.6 2.7-.2.9 2.6 2.3 1.4-.8 2.6.8 2.6-2.3 1.4-.9 2.6-2.7-.2L12 18.6l-2.2-1.6-2.7.2-.9-2.6-2.3-1.4.8-2.6-.8-2.6 2.3-1.4.9-2.6 2.7.2z" stroke-linejoin="round"/><path d="M8.7 10.8l2.3 2.3 4.3-4.4" stroke-linejoin="round"/></g></svg></button>
+    <button class="tab" type="button" data-tab="beneficios" aria-selected="false" aria-label="Benefícios"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" filter="url(#tinta-icone)"><rect x="3.8" y="8" width="16.4" height="4.2" rx="1"/><path d="M5.3 12.2v7.3a1 1 0 0 0 1 1h11.4a1 1 0 0 0 1-1v-7.3M12 8v12.5"/><path d="M12 8C10.6 4.6 7.2 4.2 7.2 6.3 7.2 7.6 9.4 8 12 8zm0 0c1.4-3.4 4.8-3.8 4.8-1.7 0 1.3-2.2 1.7-4.8 1.7z"/></g></svg></button>
+    <button class="tab" type="button" data-tab="voce" aria-selected="false" aria-label="Você"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" filter="url(#tinta-icone)"><circle cx="12" cy="12" r="9.2"/><circle cx="12" cy="9.8" r="3.2"/><path d="M6.3 18.4c1.3-2.3 3.4-3.4 5.7-3.4s4.4 1.1 5.7 3.4"/></g></svg></button>
+  </nav>
+  <div id="sheet"><div class="scrim" data-act="closeSheet"></div><div class="panel" id="panel"></div></div>
+  <div id="lock"></div>
+  <div id="toast"></div>
+  <div class="home-ind" aria-hidden="true"></div>
+</div>
+
+<script>
+(function(){
+"use strict";
+
+/* =====================================================================
+   FORMAS (da landing v4): ruído determinístico, curva fechada, blob
+   ===================================================================== */
+function rng(a){ return function(){ a|=0; a=a+0x6D2B79F5|0; var t=Math.imul(a^a>>>15,1|a); t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; }; }
+function r1(n){ return Math.round(n*10)/10; }
+function closed(p){
+  var n=p.length, d="M"+r1(p[0][0])+" "+r1(p[0][1]);
+  for(var i=0;i<n;i++){
+    var p0=p[(i-1+n)%n], p1=p[i], p2=p[(i+1)%n], p3=p[(i+2)%n];
+    d+="C"+r1(p1[0]+(p2[0]-p0[0])/6)+" "+r1(p1[1]+(p2[1]-p0[1])/6)+" "+r1(p2[0]-(p3[0]-p1[0])/6)+" "+r1(p2[1]-(p3[1]-p1[1])/6)+" "+r1(p2[0])+" "+r1(p2[1]);
+  }
+  return d+"Z";
+}
+function blob(seed){
+  var R=rng(seed), N=9, ry=.7+R()*.3, pts=[];
+  for(var i=0;i<N;i++){
+    var a=i/N*Math.PI*2+(R()-.5)*.35, r=33+R()*15;
+    pts.push([50+Math.cos(a)*r, 50+Math.sin(a)*r*ry]);
+  }
+  return closed(pts);
+}
+function blobSVG(ink, seed, style, cls){
+  return '<svg class="'+(cls||"")+'" viewBox="0 0 100 100" style="'+(style||"")+'" aria-hidden="true"><path d="'+blob(seed)+'" fill="var(--tinta-'+ink+')" filter="url(#fibra)"/></svg>';
+}
+/* blobs decorativos de fundo: [tinta, left %, top px, largura px, giro, seed] — um rosa por tela */
+function vblobs(list){
+  return '<div class="vblobs" aria-hidden="true">'+list.map(function(b){
+    return blobSVG(b[0], b[5], "left:"+b[1]+"%;top:"+b[2]+"px;width:"+b[3]+"px;transform:rotate("+b[4]+"deg);filter:drop-shadow(0 0 22px color-mix(in srgb, var(--tinta-"+b[0]+") 55%, transparent))");
+  }).join("")+'</div>';
+}
+
+/* =====================================================================
+   AVATAR (provisório: blob de tinta com rosto)
+   ===================================================================== */
+function avatar(state, ink, cls){
+  ink = ink || S.avatarInk;
+  var face="", extra="";
+  if(state==="feliz"){
+    face='<path d="M34 47q5-7 10 0M56 47q5-7 10 0"/><path d="M38 58q12 14 24 0z" fill="#020202"/>';
+  } else if(state==="ressaca"){
+    face='<path d="M34 48l10 1.5M56 49.5l10-1.5"/><path d="M35 53q4 3 8 0M57 53q4 3 8 0" stroke-width="1.6" opacity=".55"/><path d="M39 64q3.5-4 7 0t7 0t7 0"/>';
+    extra='<g transform="translate(58 4) rotate(18)"><path d="'+blob(77)+'" transform="scale(.36)" fill="var(--tinta-ciano)" filter="url(#fibra)" style="mix-blend-mode:multiply"/></g>'+
+          '<text x="84" y="26" font-family="DM Mono,monospace" font-size="11" font-weight="500" fill="var(--ink-muted)" stroke="none">z z</text>';
+  } else {
+    face='<circle cx="40" cy="47" r="3.6" fill="#020202" stroke="none"/><circle cx="60" cy="47" r="3.6" fill="#020202" stroke="none"/><path d="M41 59q9 7 18 0"/>';
+  }
+  return '<svg class="avatar '+(cls||"")+'" viewBox="0 0 100 100" aria-hidden="true"><g style="isolation:isolate"><path d="'+blob(21)+'" fill="var(--tinta-'+ink+')" filter="url(#fibra)"/>'+extra+
+    '</g><g fill="none" stroke="#020202" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">'+face+'</g></svg>';
+}
+function face(seed, ink){
+  return '<svg viewBox="0 0 100 100" aria-hidden="true"><path d="'+blob(seed)+'" fill="var(--tinta-'+ink+')" filter="url(#fibra)" stroke="var(--surface)" stroke-width="5"/>'+
+    '<circle cx="41" cy="47" r="4" fill="#020202"/><circle cx="59" cy="47" r="4" fill="#020202"/><path d="M42 59q8 6 16 0" fill="none" stroke="#020202" stroke-width="3.4" stroke-linecap="round"/></svg>';
+}
+
+/* =====================================================================
+   CARIMBO (impressão sobre papel)
+   ===================================================================== */
+var uid=0;
+function stampSVG(c, extraCls){
+  var id="sp"+(uid++), col="var(--p-"+c.cor+")", nome=c.nome.toUpperCase();
+  var inner;
+  if(c.forma==="ret"){
+    var n1=nome.length>13?nome.slice(0,13):nome;
+    inner='<rect x="8" y="28" width="104" height="64" rx="6" fill="none" stroke="currentColor" stroke-width="4"/>'+
+      '<rect x="14" y="34" width="92" height="52" rx="3" fill="none" stroke="currentColor" stroke-width="1.5"/>'+
+      '<text x="60" y="51" font-size="10.5" letter-spacing=".6">'+n1+'</text>'+
+      '<text x="60" y="70" font-size="17" letter-spacing="1">'+c.data+'</text>'+
+      '<text x="60" y="81" font-size="7.5" letter-spacing="1.2">ENTRADA '+c.hora+'</text>';
+  } else {
+    var ring=(nome+" · "+(c.bairro||"RIO")+" · ").toUpperCase();
+    inner='<defs><path id="'+id+'" d="M60 60m-43 0a43 43 0 1 1 86 0a43 43 0 1 1-86 0"/></defs>'+
+      '<circle cx="60" cy="60" r="54" fill="none" stroke="currentColor" stroke-width="4.5"/>'+
+      '<circle cx="60" cy="60" r="33" fill="none" stroke="currentColor" stroke-width="1.6"/>'+
+      '<text font-size="9" letter-spacing="1"><textPath href="#'+id+'" textLength="266" lengthAdjust="spacing">'+ring+'</textPath></text>'+
+      '<text x="60" y="61" font-size="15" letter-spacing=".5">'+c.data+'</text>'+
+      '<text x="60" y="74" font-size="7.5" letter-spacing="1">'+c.hora+'</text>';
+  }
+  return '<svg class="stampsvg '+(extraCls||"")+'" viewBox="0 0 120 120" style="color:'+col+';--r:'+c.giro+'deg;transform:rotate('+c.giro+'deg)" aria-hidden="true"><g filter="url(#carimbo)">'+inner+'</g></svg>';
+}
+/* selo genérico (RESGATADO, PAGO, ARQUIVADO) */
+function selo(txt, sub, cor, giro, cls){
+  var id="se"+(uid++);
+  return '<svg class="stampsvg '+(cls||"")+'" viewBox="0 0 120 120" style="color:var(--p-'+cor+');--r:'+giro+'deg;transform:rotate('+giro+'deg)" aria-hidden="true"><g filter="url(#carimbo)">'+
+    '<defs><path id="'+id+'" d="M60 60m-44 0a44 44 0 1 1 88 0a44 44 0 1 1-88 0"/></defs>'+
+    '<circle cx="60" cy="60" r="55" fill="none" stroke="currentColor" stroke-width="5"/><circle cx="60" cy="60" r="34" fill="none" stroke="currentColor" stroke-width="1.6"/>'+
+    '<text font-size="8.6" letter-spacing="1"><textPath href="#'+id+'" textLength="272" lengthAdjust="spacing">CARIMBO · RIO DE JANEIRO · NOITE · 2026 · </textPath></text>'+
+    '<text x="60" y="'+(sub?62:65)+'" font-size="'+(txt.length>8?11:14)+'" letter-spacing=".6">'+txt+'</text>'+(sub?'<text x="60" y="75" font-size="7.5" letter-spacing="1">'+sub+'</text>':'')+'</g></svg>';
+}
+
+/* =====================================================================
+   DADOS FALSOS
+   ===================================================================== */
+var EV = {
+  baile:{id:"baile", nome:"Baile Tinta Fresca", local:"Galpão Riachuelo", bairro:"Lapa", dia:"SEX 07 NOV", hora:"23H00", gen:"Funk", i:["rosa","ciano"], preco:"R$ 60",
+    beneficios:[["t-ciano","No bar","10% no bar","Pague no cartão virtual. Taxa Carimbo 2%: você fica com 8%."],["t-papel","Cartão fidelidade","5 visitas = entrada grátis","Cada check-in aqui conta uma visita."]],
+    lot:4, lotTxt:"Cheia", gasto:"R$ 80", pico:"00H30", resp:42, vai:24, promo:true, x:118, y:262},
+  roda:{id:"roda", nome:"Roda da Prainha", local:"Largo da Prainha", bairro:"Saúde", dia:"SÁB 08 NOV", hora:"18H00", gen:"Samba", i:["lima","ciano"], preco:"Grátis",
+    beneficios:[["t-laranja","Patrocinado · cachaça parceira","Caipirinha em dobro","Pague 1, leve 2 até as 21h."]],
+    lot:3, lotTxt:"Boa", gasto:"R$ 45", pico:"20H00", resp:88, vai:61, promo:true, pat:true, x:176, y:96},
+  selva:{id:"selva", nome:"Selva Elétrica", local:"Armazém 6", bairro:"Gamboa", dia:"SÁB 08 NOV", hora:"23H59", gen:"Eletrônica", i:["rosa","laranja"], preco:"R$ 90",
+    beneficios:[["t-rosa","Ingresso","15% no próximo ingresso","Vale para a próxima edição da festa."]],
+    lot:2, lotTxt:"Tranquila", gasto:"R$ 120", pico:"02H00", resp:17, vai:9, promo:true, novo:true, x:84, y:58},
+  quintal:{id:"quintal", nome:"Pagode do Quintal", local:"Quintal da Real", bairro:"Botafogo", dia:"DOM 09 NOV", hora:"16H00", gen:"Pagode", i:["lima","ciano"], preco:"R$ 30",
+    beneficios:[["t-lima","Na entrada","Chegou antes das 17h, entra por R$ 20","Mostre o check-in na porta."]],
+    lot:3, lotTxt:"Boa", gasto:"R$ 55", pico:"18H00", resp:63, vai:33, promo:true, x:230, y:378},
+  esquina:{id:"esquina", nome:"Bar da Esquina 22", local:"Rua do Lavradio", bairro:"Lapa", dia:"ABERTO HOJE", hora:"ATÉ 02H", gen:"Boteco", i:["ciano","rosa"], preco:"Entrada livre",
+    beneficios:[], lot:2, lotTxt:"Tranquila", gasto:"R$ 40", pico:"22H00", resp:9, vai:0, promo:false, x:158, y:228}
+};
+var ORDEM = ["baile","roda","selva","quintal","esquina"];
+var REVIEWS = {
+  baile:[
+    {nome:"Nanda", seed:31, ink:"lima", data:"01 NOV", txt:"Fila andou rápido até meia-noite, depois travou. O som é muito bom e o bar com desconto compensa. Vá de tênis.", aj:14},
+    {nome:"Caio", seed:32, ink:"ciano", data:"25 OUT", txt:"Valeu a noite. Som bom e público animado.", aj:6},
+    {nome:"Rafa Lapa", seed:33, ink:"laranja", data:"18 OUT", curador:true, txt:"Lotou demais depois da 1h. Banheiro limpo, água de graça no bar.", aj:21}
+  ],
+  roda:[{nome:"Teté Samba", seed:34, ink:"rosa", data:"01 NOV", curador:true, txt:"Chega cedo para pegar sombra. A caipirinha em dobro vale muito.", aj:30}],
+  selva:[{nome:"Bia", seed:35, ink:"lima", data:"11 OUT", txt:"Valeu a noite, o som segurou até o fim.", aj:3}],
+  quintal:[{nome:"Juca", seed:36, ink:"ciano", data:"02 NOV", txt:"Roda boa, cerveja gelada, gente simpática. Lota depois das 18h.", aj:11}],
+  esquina:[]
+};
+var NIV = [
+  {n:3, b:"1 drink por conta da casa", id:"l1"},
+  {n:5, b:"15% off no próximo ingresso", id:"l2"},
+  {n:8, b:"A definir", sug:true},
+  {n:12, b:"A definir", sug:true}
+];
+var BONUS_PAGINA = 20;
+var TROCA = [
+  {id:"b1", tk:"t-ciano", kind:"No bar", titulo:"10% no bar", onde:"Baile Tinta Fresca · Lapa", pts:50, val:"10% de desconto · taxa Carimbo 2% · você fica com 8%", validade:"até 30 NOV"},
+  {id:"b3", tk:"t-laranja", kind:"Patrocinado · cachaça parceira", titulo:"Caipirinha em dobro", onde:"Roda da Prainha · Saúde", pts:70, val:"Pague 1, leve 2 · taxa Carimbo 2% sobre o valor pago", validade:"até 30 NOV"},
+  {id:"b2", tk:"t-lima", kind:"Ingresso", titulo:"R$ 10 off no ingresso", onde:"Qualquer festa parceira", pts:100, val:"R$ 10 de desconto · taxa 2% (R$ 0,20) · você fica com R$ 9,80", validade:"até 31 DEZ"}
+];
+var ARQUIVO = {
+  out:{mes:"OUT 2026", carimbos:[
+    {nome:"Baile Tinta Fresca",bairro:"LAPA",data:"03 OUT",hora:"23H55",cor:"rosa",forma:"redondo",giro:-7},
+    {nome:"Roda da Prainha",bairro:"SAÚDE",data:"05 OUT",hora:"18H20",cor:"azul",forma:"ret",giro:5},
+    {nome:"Selva Elétrica",bairro:"GAMBOA",data:"11 OUT",hora:"00H40",cor:"verde",forma:"redondo",giro:9},
+    {nome:"Baile Tinta Fresca",bairro:"LAPA",data:"18 OUT",hora:"23H30",cor:"rosa",forma:"ret",giro:-4},
+    {nome:"Pagode do Quintal",bairro:"BOTAFOGO",data:"19 OUT",hora:"16H50",cor:"verm",forma:"redondo",giro:3},
+    {nome:"Baile Tinta Fresca",bairro:"LAPA",data:"25 OUT",hora:"00H10",cor:"azul",forma:"redondo",giro:-9}]},
+  set:{mes:"SET 2026", carimbos:[
+    {nome:"Roda da Prainha",bairro:"SAÚDE",data:"06 SET",hora:"18H00",cor:"verde",forma:"redondo",giro:6},
+    {nome:"Pagode do Quintal",bairro:"BOTAFOGO",data:"14 SET",hora:"17H10",cor:"verm",forma:"ret",giro:-5},
+    {nome:"Selva Elétrica",bairro:"GAMBOA",data:"20 SET",hora:"01H20",cor:"rosa",forma:"redondo",giro:-8},
+    {nome:"Roda da Prainha",bairro:"SAÚDE",data:"27 SET",hora:"19H30",cor:"azul",forma:"redondo",giro:4}]}
+};
+var CONTATOS = [["Bia Moraes",35,"lima",true],["Caio R.",32,"ciano",true],["Duda",37,"laranja",false],["Nanda",31,"lima",true],["Pedro Lapa",38,"rosa",false],["Teté",34,"rosa",true]];
+
+/* =====================================================================
+   ESTADO (falso)
+   ===================================================================== */
+var S;
+function recorrente(){
+  S = {conta:true, optin:true, avatarInk:"rosa", pontos:85, mes:"NOV 2026",
+    carimbos:[
+      {nome:"Roda da Prainha",bairro:"SAÚDE",data:"01 NOV",hora:"19H10",cor:"azul",forma:"redondo",giro:-8},
+      {nome:"Pagode do Quintal",bairro:"BOTAFOGO",data:"02 NOV",hora:"17H30",cor:"verde",forma:"ret",giro:6}],
+    arquivo:["out","set"], carteira:[], resgatados:{}, noite:null, checkinHoje:false, perguntasPend:false, posPend:false, minhaReview:null,
+    salvos:{}, ajudou:{}, voucher:null, fidelidade:2, novos:{}, gpsErro:false, lojaVazia:false, exMode:"lista", filtro:"Hoje",
+    pageView:null, listas:[], pago:false, perguntasFeitas:false, locAsked:true, optinAsked:true, avatarAsked:true, pv:{amigos:true, recs:true, notif:true}};
+}
+function novo(){
+  recorrente();
+  S.conta=false; S.optin=false; S.pontos=0; S.carimbos=[]; S.arquivo=[]; S.fidelidade=0; S.locAsked=false; S.optinAsked=false; S.avatarAsked=false;
+}
+recorrente();
+
+function nivelInfo(total){
+  var acc=0;
+  for(var i=0;i<NIV.length;i++){
+    if(total < acc+NIV[i].n) return {pag:i, ini:acc, n:NIV[i].n, feitos:total-acc, falta:acc+NIV[i].n-total, nivel:NIV[i]};
+    acc+=NIV[i].n;
+  }
+  var L=NIV.length-1; return {pag:L, ini:acc-NIV[L].n, n:NIV[L].n, feitos:NIV[L].n, falta:0, nivel:NIV[L]};
+}
+function paginasCompletas(total){ var acc=0, c=0; for(var i=0;i<NIV.length;i++){ acc+=NIV[i].n; if(total>=acc) c++; } return c; }
+function brl(v){ return "R$ "+v.toFixed(2).replace(".",","); }
+function plural(n, s, p){ return n+" "+(n===1?s:p); }
+
+/* =====================================================================
+   COMPONENTES
+   ===================================================================== */
+function posterHTML(e, h, big){
+  var R=rng(e.id.length*7+3);
+  var sz=Math.round(h*(.82+R()*.12)), t=Math.round(h*(.04+R()*.08)), rgt=Math.round(-2-R()*4);
+  return '<div class="poster'+(e.promo?"":" nopromo")+'" style="--h:'+h+'px;--i1:var(--tinta-'+e.i[0]+')">'+
+    (e.promo? blobSVG(e.i[1], e.id.length*5+1, "right:"+rgt+"%;top:"+t+"px;width:"+sz+"px", "pb") : "")+
+    '<div class="ht"></div>'+
+    '<div class="p-top"><span>'+e.dia+' · '+e.hora+'</span>'+(e.pat?'<span class="tag pat" style="--r:2deg">Patrocinado</span>':(e.promo?'<span>'+e.gen+'</span>':'<span class="tag cin" style="--r:2deg">Sem benefício ainda</span>'))+'</div>'+
+    '<div class="p-t'+(big?" l":"")+'">'+e.nome+'</div>'+(e.promo?'<span class="reg"></span>':'')+
+  '</div>';
+}
+function eventCard(e, i){
+  var tags = e.beneficios.slice(0,1).map(function(b){ return '<span class="tag lima" style="--r:-2deg">'+b[2]+'</span>'; }).join("");
+  if(e.novo) tags += '<span class="tag" style="--r:1.5deg">Fora do seu hábito</span>';
+  if(!e.promo) tags += '<span class="tag cin" style="--r:1deg">Só informação</span>';
+  return '<button class="ecard st" style="--i:'+i+'" data-go="evento/'+e.id+'" type="button">'+posterHTML(e,168)+
+    '<div class="e-body"><div class="e-name">'+e.nome+'</div><div class="e-meta">'+e.local+' · '+e.bairro+' · '+e.preco+(e.vai&&S.optin?' · '+e.vai+' vão':'')+'</div><div class="row-gap">'+tags+'</div></div></button>';
+}
+function ticketHTML(o){
+  /* o: tk, kind, no, titulo, p, price, falta, locked, novo, code, act, arg, go, seal, r */
+  var attrs = o.go?' data-go="'+o.go+'"':(o.act?' data-act="'+o.act+'" data-arg="'+(o.arg||"")+'"':'');
+  return '<button type="button" class="ticket '+(o.locked?"locked":o.tk)+' st" style="--r:'+(o.r||0)+'deg;--i:'+(o.i||0)+'"'+attrs+'>'+
+    (o.novo?'<span class="tag rosa tk-novo" style="--r:6deg">Novo</span>':'')+
+    '<div class="tk-main"><div class="tk-top"><span>'+o.kind+'</span><span>'+(o.no||"")+'</span></div><h3>'+o.titulo+'</h3>'+(o.p?'<p>'+o.p+'</p>':'')+
+    (o.price?'<span class="tk-price'+(o.falta?" falta":"")+'">'+o.price+'</span>':'')+'</div>'+
+    '<div class="tk-stub"><span class="tk-bar"></span><span class="tk-code">'+(o.code||"CB·01")+'</span></div>'+
+    (o.seal?'<span class="tk-seal">'+o.seal+'</span>':'')+
+  '</button>';
+}
+function backBtn(label, cls){ return '<button class="backbtn '+(cls||"")+'" type="button" data-back>'+(label||"Voltar")+'</button>'; }
+function header(eyebrow, title, op){
+  return '<div class="eyebrow st" style="--i:0">'+eyebrow+'</div><h1 class="h-xl overprint '+(op||"")+' st" style="--i:1" data-t="'+title+'">'+title+'</h1>';
+}
+function bookHTML(carimbos, pagIdx, opts){
+  opts=opts||{};
+  var acc=0; for(var i=0;i<pagIdx;i++) acc+=NIV[i].n;
+  var niv=NIV[pagIdx], total=carimbos.length, locked = total < acc && !opts.arquivo;
+  var cells="";
+  for(var k=0;k<niv.n;k++){
+    var c=carimbos[acc+k];
+    if(c) cells+='<div class="slot">'+stampSVG(c)+'</div>';
+    else cells+='<div class="slot empty'+(acc+k===total && !opts.arquivo && !opts.noNext?" next":"")+'" '+(acc+k===total?'id="nextslot"':'')+'><span>'+String(acc+k+1).padStart(2,"0")+'</span></div>';
+  }
+  var feitos=Math.max(0,Math.min(niv.n,total-acc)), falta=niv.n-feitos;
+  var foot = opts.arquivo ? (feitos? plural(feitos,"carimbo","carimbos")+" nesta página" : "Página em branco") :
+    (falta===0 ? '<b>Página completa.</b> Rendeu: '+niv.b.toLowerCase()+(niv.sug?'':' + '+BONUS_PAGINA+' pontos') :
+      (locked ? 'Abre quando a página '+pagIdx+' estiver completa.' :
+      'Faltam '+plural(falta,"carimbo","carimbos")+' para: '+(niv.sug?'próximo nível (a definir)':niv.b.toLowerCase())));
+  return '<div class="book" id="book">'+
+    '<div class="pp-head"><span>PASSAPORTE · '+(opts.mes||S.mes)+'</span><span>PÁG. '+(pagIdx+1)+'/'+NIV.length+'</span></div>'+
+    '<div class="pp-page"><div class="pp-flip '+(opts.turn||"")+(locked?" pp-dim":"")+'"><div class="slots'+(niv.n>5?" c4":"")+'">'+cells+'</div></div></div>'+
+    '<div class="pp-foot">'+foot+'</div>'+
+    '<div class="pp-mrz" aria-hidden="true">P&lt;BRA&lt;CARIMBO&lt;&lt;NOITE&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;<br>0007312&lt;BRA&lt;2611071&lt;M&lt;'+(opts.mes||S.mes).replace(" ","&lt;")+'&lt;&lt;&lt;04</div>'+
+  '</div>';
+}
+function reguaHTML(total){
+  var info=nivelInfo(total), acc=0, items="", pct=0, done=paginasCompletas(total);
+  NIV.forEach(function(nv,i){
+    acc+=nv.n; var ok=total>=acc, cur=i===info.pag && !ok;
+    items+='<li class="'+(ok?"ok":"")+(cur?" cur":"")+'"><span class="n">'+nv.n+'</span><small>'+nv.b+'</small>'+(nv.sug?'<em>SUGESTÃO</em>':'<em>+'+BONUS_PAGINA+' PTS</em>')+'</li>';
+  });
+  pct = Math.min(1,(done + (info.falta? info.feitos/info.n : 0))/ (NIV.length-1));
+  return '<div class="regua"><span class="trilho"></span><span class="fill" style="width:calc((100% - 28px) * '+pct.toFixed(3)+')"></span><ol>'+items+'</ol></div>';
+}
+function lojaItemState(t){
+  var tem=S.pontos>=t.pts, res=S.resgatados[t.id];
+  return {tem:tem, res:res, falta:t.pts-S.pontos};
+}
+
+/* =====================================================================
+   TELAS
+   ===================================================================== */
+var R = {};
+
+R.abertura = function(){
+  return {noTab:true, noNight:true, cls:"notab", html:
+    vblobs([["laranja",36,30,300,10,1],["ciano",50,200,240,-20,2],["lima",-10,430,160,0,3],["rosa",70,440,120,30,4]])+
+    '<div class="halftone" style="--hx:80%;--hy:40%"></div>'+
+    '<div class="hero-stamp bate" style="--r:8deg;--d:500;transform:rotate(8deg)" aria-hidden="true"><b>ENTRADA 23H40</b><span>07 NOV 2026</span></div>'+
+    '<div class="abertura">'+
+      '<div class="eyebrow st" style="--i:0">Noite do Rio · desde 2026</div>'+
+      '<h1 class="hero-t overprint st" style="--i:1" data-t="Carimbo">Carimbo</h1>'+
+      '<p class="lead st" style="--i:2;color:var(--ink);margin-top:14px">Vá à festa, carimbe o passaporte e conte como foi. Cada noite vira desconto na próxima.</p>'+
+      '<div class="flexcol mt32">'+
+        '<button class="btn full big rl st" style="--i:3" type="button" data-go="voucher">Tenho um voucher</button>'+
+        '<button class="btn full big ghost st" style="--i:4" type="button" data-act="explorarSemConta">Explorar sem conta</button>'+
+        '<button class="link st" style="--i:5" type="button" data-act="jaTenhoConta">Já tenho conta</button>'+
+      '</div>'+
+    '</div>'};
+};
+
+R.voucher = function(){
+  var ok=!!S.voucher;
+  return {noTab:true, noNight:true, cls:"notab", html:
+    '<div class="glow" style="--glow:var(--tinta-laranja);--gx:10%"></div>'+
+    '<div class="topbar">'+backBtn()+'</div>'+
+    header("Voucher de influencer","Seu voucher","oo")+
+    '<p class="lead mt12 st" style="--i:2">Quem te indicou ganha quando você compra com o cupom. Você ganha desconto no primeiro ingresso.</p>'+
+    (ok ? '<div class="mt24">'+ticketHTML({tk:"t-rosa", kind:"Voucher · @bia.na.noite", no:"Nº 0415", titulo:"15% off no 1º ingresso", p:"Vale em qualquer festa parceira. Válido até 30 NOV.", code:"BIA15", r:-1.4, seal:selo("APLICADO","07 NOV 2026","azul",-12,"bate")})+'</div>'+
+      '<p class="small muted mt16 center">O voucher já está na sua carteira.</p>'+
+      '<button class="btn full big mt24" type="button" data-act="comecar">Começar a explorar</button>'
+    : '<div class="mt24 st" style="--i:3"><label class="mono small muted" for="vc">Código</label><input id="vc" class="field mono mt8" value="BIA15" autocomplete="off" spellcheck="false"></div>'+
+      '<button class="btn full big rl mt16 st" style="--i:4" type="button" data-act="aplicarVoucher">Aplicar voucher</button>'+
+      '<p class="small muted mt16 center st" style="--i:5">Sem conta por enquanto. Ela só é pedida no primeiro check-in.</p>')};
+};
+
+R.explorar = function(){
+  var lista = ORDEM.map(function(k){return EV[k];}).filter(function(e){
+    var f=S.filtro; if(f==="Hoje"||f==="Fim de semana") return true;
+    if(f==="Com benefício") return e.promo; if(f==="Fora do hábito") return !!e.novo; return e.gen===f;
+  });
+  var filtros=["Hoje","Fim de semana","Com benefício","Fora do hábito","Funk","Samba","Pagode","Eletrônica"];
+  var body;
+  if(S.exMode==="mapa"){
+    body='<div class="map st" style="--i:4">'+mapaSVG()+'<div class="mapcard" id="mapcard">'+mapCard("baile")+'</div></div>'+
+      '<p class="small muted mt12">Todos os lugares aparecem no mapa. Os cinzas ainda não têm benefício.</p>';
+  } else {
+    body = lista.length? lista.map(function(e,i){return eventCard(e,i+4);}).join("") :
+      '<div class="card center"><p class="muted">Nada com esse filtro hoje.</p></div>';
+  }
+  return {tab:"explorar", html:
+    '<div class="glow" style="--glow:var(--tinta-ciano);--gx:90%"></div>'+
+    vblobs([["ciano",70,-60,200,0,8],["rosa",-30,10,120,0,5]])+
+    header("Rio · hoje, sex 07 nov","Explorar")+
+    (S.voucher?'<div class="mt12 st" style="--i:2"><span class="tag lar" style="--r:-1.5deg">Voucher BIA15 · 15% off no 1º ingresso</span></div>':'')+
+    '<div class="topbar mt16 st" style="--i:2;margin-bottom:6px"><div class="seg" role="group"><button type="button" data-act="exMode" data-arg="lista" aria-pressed="'+(S.exMode==="lista")+'">Lista</button><button type="button" data-act="exMode" data-arg="mapa" aria-pressed="'+(S.exMode==="mapa")+'">Mapa</button></div><span class="mono small muted">'+plural(ORDEM.length,"lugar","lugares")+'</span></div>'+
+    '<div class="chips st" style="--i:3">'+filtros.map(function(f){return '<button class="chip" type="button" data-act="filtro" data-arg="'+f+'" aria-pressed="'+(S.filtro===f)+'">'+f+'</button>';}).join("")+'</div>'+
+    '<div class="mt12">'+body+'</div>'};
+};
+function mapaSVG(){
+  var R2=rng(5), ruas="";
+  for(var i=0;i<14;i++){ var x1=R2()*360,y1=R2()*440,x2=x1+(R2()-.5)*300,y2=y1+(R2()-.5)*300; ruas+='<path d="M'+r1(x1)+' '+r1(y1)+'Q'+r1((x1+x2)/2+(R2()-.5)*80)+' '+r1((y1+y2)/2+(R2()-.5)*80)+' '+r1(x2)+' '+r1(y2)+'"/>'; }
+  var pins="";
+  ORDEM.forEach(function(k,i){
+    var e=EV[k];
+    if(e.promo){
+      pins+='<g class="pin" data-act="mapPin" data-arg="'+k+'"><g transform="translate('+(e.x-17)+' '+(e.y-17)+') scale(.34)"><path d="'+blob(40+i)+'" fill="var(--tinta-'+e.i[0]+')" filter="url(#fibra)"/></g>'+
+        '<g transform="translate('+(e.x-12)+' '+(e.y-14)+') scale(.26)" style="mix-blend-mode:multiply"><path d="'+blob(50+i)+'" fill="var(--tinta-'+e.i[1]+')"/></g>'+
+        '<text class="plbl" x="'+e.x+'" y="'+(e.y+28)+'">'+e.nome+'</text></g>';
+    } else {
+      pins+='<g class="pin" data-act="mapPin" data-arg="'+k+'"><circle cx="'+e.x+'" cy="'+e.y+'" r="8" fill="var(--sunken)" stroke="var(--border-control)" stroke-width="1.5"/><text class="plbl nop" x="'+e.x+'" y="'+(e.y+22)+'">'+e.nome+'</text></g>';
+    }
+  });
+  return '<svg viewBox="0 0 358 440" aria-label="Mapa ilustrado do centro do Rio">'+
+    '<path d="M262 0C292 70 310 130 296 210C288 270 318 330 358 350L358 0Z" fill="var(--tinta-ciano)" opacity=".16"/>'+
+    '<path d="M358 400C330 410 300 440 290 440L358 440Z" fill="var(--tinta-ciano)" opacity=".16"/>'+
+    '<text class="bairro" x="318" y="120" transform="rotate(70 318 120)">BAÍA DE GUANABARA</text>'+
+    '<g fill="none" stroke="var(--hairline)" stroke-width="1.4" opacity=".9">'+ruas+'</g>'+
+    '<g fill="none" stroke="var(--sunken)" stroke-width="7" stroke-linecap="round"><path d="M20 300Q120 240 200 180T300 40"/><path d="M90 440Q140 330 230 300T300 200"/></g>'+
+    '<text class="bairro" x="70" y="30">GAMBOA</text><text class="bairro" x="200" y="64">SAÚDE</text><text class="bairro" x="140" y="168">CENTRO</text>'+
+    '<text class="bairro" x="70" y="232">LAPA</text><text class="bairro" x="214" y="282">GLÓRIA</text><text class="bairro" x="280" y="420">BOTAFOGO</text>'+
+    '<g isolation="isolate" style="isolation:isolate">'+pins+'</g>'+
+    '<circle class="vc" cx="132" cy="300" r="10" fill="none" stroke="var(--tinta-lima)" stroke-width="2"/><circle cx="132" cy="300" r="5" fill="var(--tinta-lima)"/>'+
+    '<text class="plbl" x="132" y="322" style="fill:var(--tinta-lima)">VOCÊ</text>'+
+  '</svg>';
+}
+function mapCard(k){
+  var e=EV[k];
+  return '<button class="card rough" type="button" data-go="evento/'+k+'" style="display:flex;width:100%;text-align:left;gap:12px;align-items:center;padding:14px 16px">'+
+    '<div style="flex:1;min-width:0"><div class="mono small muted" style="font-size:11px">'+e.dia+' · '+e.bairro+'</div><div class="h-sub">'+e.nome+'</div>'+
+    '<div class="small" style="color:'+(e.promo?'var(--tinta-lima)':'var(--ink-muted)')+'">'+(e.promo?e.beneficios[0][2]:'Sem benefício ainda')+'</div></div><span class="mono small muted">Ver</span></button>';
+}
+
+R.evento = function(id){
+  var e=EV[id]||EV.baile, revs=(REVIEWS[e.id]||[]).slice();
+  if(S.minhaReview && S.minhaReview.ev===e.id) revs.unshift(S.minhaReview);
+  var salvo=!!S.salvos[e.id];
+  var lot=""; for(var i=1;i<=5;i++) lot+='<i class="'+(i<=e.lot?"on":"")+'"></i>';
+  var quem;
+  if(!e.vai) quem='<p class="muted">Ninguém marcou presença ainda.</p>';
+  else if(!S.optin) quem='<div class="card"><p>Aqui só aparece quem aceitou aparecer. Ative para ver quem vai e ser visto também.</p><button class="btn ghost sm mt12" type="button" data-act="optinSheet">Aparecer em “quem vai”</button></div>';
+  else quem='<div class="faces">'+face(31,"lima")+face(32,"ciano")+face(35,"laranja")+face(38,"lima")+'<span class="mais">+'+(e.vai-4)+'</span></div><p class="small muted mt12">Nanda, Caio, Bia e mais '+(e.vai-3)+' pessoas que aceitaram aparecer. Você também aparece.</p>';
+  var revHTML = revs.length? revs.map(function(r,i){
+    var mine=r.mine, k=e.id+i, on=!!S.ajudou[k];
+    return '<div class="rev'+(mine?" mine":"")+'"><div class="rh">'+(mine?avatar("ok"):face(r.seed,r.ink))+'<b>'+(mine?"Você":r.nome)+'</b>'+(r.curador?'<span class="tag lar" style="--r:-1deg">Curador</span>':'')+'<span class="mono">'+r.data+'</span></div><p>'+r.txt+'</p>'+
+      (mine?'<p class="mono small mt8" style="color:var(--tinta-lima);font-size:11px">+10 PONTOS · CADA “ISSO AJUDOU” RENDE +1</p>':
+      '<button class="ajudou" type="button" data-act="ajudou" data-arg="'+k+'" aria-pressed="'+on+'">Isso ajudou <b>'+(r.aj+(on?1:0))+'</b></button>')+'</div>';
+  }).join("") : '<p class="muted">Ainda sem reviews. A primeira rende +10 pontos.</p>';
+  return {tab:null, cls:"notab flush", noNight:true, noTab:true, html:
+    '<div class="topbar" style="position:absolute;z-index:5;top:calc(var(--top) + 22px);left:26px;right:26px">'+backBtn("Voltar","on-poster")+
+      '<button class="backbtn on-poster" type="button" data-act="salvar" data-arg="'+e.id+'">'+(salvo?"Salvo":"Salvar")+'</button></div>'+
+    '<div class="st" style="--i:0">'+posterHTML(e,300,true)+'</div>'+
+    '<div class="mt16 st" style="--i:1"><div class="mono small muted" style="font-size:12px">'+e.dia+' · '+e.hora+' · '+e.gen+'</div><h1 class="h-disp mt8">'+e.nome+'</h1><p class="muted mt8">'+e.local+' · '+e.bairro+' · '+e.preco+'</p></div>'+
+    (e.beneficios.length? '<div class="sec"><div class="sh"><h2>Benefícios aqui</h2><span>Taxa sempre visível</span></div><div class="tickets">'+
+      e.beneficios.map(function(b,i){ return ticketHTML({tk:b[0], kind:b[1], no:"Nº 0"+(i+1), titulo:b[2], p:b[3], code:e.id.toUpperCase().slice(0,3)+"·0"+(i+1), r:i%2?1.2:-1.2, i:i+2, act:"comoUsar"}); }).join("")+'</div></div>'
+      : '<div class="sec"><div class="card"><p>Este lugar ainda não tem benefício no Carimbo. As informações vêm do Google e das respostas de quem foi.</p></div></div>')+
+    '<div class="sec"><div class="sh"><h2>Como costuma estar</h2><span>'+e.resp+' respostas</span></div><div class="stats">'+
+      '<div class="stat"><span class="mono">Lotação</span><b>'+e.lotTxt+'</b><div class="lota">'+lot+'</div></div>'+
+      '<div class="stat"><span class="mono">Gasto médio</span><b>'+e.gasto+'</b></div>'+
+      '<div class="stat"><span class="mono">Pico</span><b>'+e.pico+'</b></div></div></div>'+
+    '<div class="sec"><div class="sh"><h2>Quem vai</h2><span>Só quem aceitou</span></div>'+quem+'</div>'+
+    '<div class="sec" id="reviews"><div class="sh"><h2>Reviews</h2><span>Mais recentes primeiro</span></div>'+revHTML+'</div>'+
+    '',
+    after:function(el){
+      var ab=document.createElement("div"); ab.className="actionbar";
+      ab.innerHTML = e.promo||e.preco!=="Entrada livre" ? '<button class="btn big" type="button" data-act="comprar" data-arg="'+e.id+'">'+(e.preco==="Grátis"?"Confirmar presença":"Comprar ingresso · "+e.preco)+'</button>' : '<button class="btn big lc" type="button" data-act="comoChegar">Como chegar</button>';
+      el.appendChild(ab);
+    }};
+};
+
+/* ---------- check-in ---------- */
+R.confirmando = function(){
+  return {noTab:true, noNight:true, cls:"notab", html:
+    '<div class="glow" style="--glow:var(--tinta-rosa);--gx:50%"></div>'+
+    '<div class="topbar">'+backBtn("Cancelar")+'</div>'+
+    '<div class="eyebrow center">Check-in</div>'+
+    '<h1 class="h-disp center" id="ckTitle">Confirmando onde você está…</h1>'+
+    '<div class="radar" id="radar"><i></i><i></i><i></i><div class="core av-bob">'+avatar("ok")+'</div></div>'+
+    '<div id="ckRes" class="mt24"></div>',
+    after:function(){
+      setTimeout(function(){
+        if(cur!=="confirmando") return;
+        var res=document.getElementById("ckRes"), t=document.getElementById("ckTitle"), rd=document.getElementById("radar");
+        if(S.gpsErro){
+          t.textContent="Não deu pra confirmar o local";
+          rd.querySelector(".core").innerHTML=avatar("ressaca");
+          rd.querySelectorAll("i").forEach(function(i){i.style.display="none";});
+          res.innerHTML='<div class="card"><p>Parece que você está fora do raio do Galpão Riachuelo, ou o sinal está fraco. Chegue mais perto da entrada e tente de novo.</p></div>'+
+            '<button class="btn full big mt16" type="button" data-act="tentarDeNovo">Tentar de novo</button><button class="btn full ghost mt12" type="button" data-back>Voltar</button>';
+        } else {
+          t.innerHTML='Você está no<br><span class="overprint" data-t="Baile Tinta Fresca" style="font-family:var(--font-xl)">Baile Tinta Fresca</span>';
+          rd.querySelector(".core").innerHTML=avatar("feliz");
+          res.innerHTML='<p class="center muted">Galpão Riachuelo · Lapa · <span class="mono" style="color:var(--c-azul)">LOCAL CONFIRMADO</span></p>';
+          setTimeout(function(){ if(cur==="confirmando") go("carimbar",{replace:true}); }, 1300);
+        }
+      }, 1700);
+    }};
+};
+R.carimbar = function(){
+  var info=nivelInfo(S.carimbos.length);
+  return {noTab:true, noNight:true, cls:"notab", html:
+    '<div class="glow" style="--glow:var(--tinta-rosa);--gx:80%"></div>'+
+    '<div class="halftone" style="--ht:var(--tinta-rosa);--hx:90%;--hy:10%"></div>'+
+    '<div class="topbar">'+backBtn("Cancelar")+'<span class="mono small muted">07 NOV · 23H40</span></div>'+
+    header("Baile Tinta Fresca · Lapa","Carimba aí.")+
+    '<p class="lead mt8">Segure o botão até o carimbo descer na página.</p>'+
+    '<div class="stampstage" id="stage">'+bookHTML(S.carimbos, info.pag, {})+'</div>'+
+    '<div class="mt24" id="ckCta"><button class="btn full big holdbtn" id="holdbtn" type="button"><span class="carga"><i></i></span>Segure para carimbar</button></div>',
+    after:setupHold};
+};
+function setupHold(){
+  var b=document.getElementById("holdbtn"); if(!b) return;
+  var timer=null, done=false;
+  function start(ev){ if(done) return; ev.preventDefault(); b.classList.add("holding","pressed"); timer=setTimeout(function(){ done=true; fazerCarimbo(); }, 700); }
+  function stop(){ if(done) return; clearTimeout(timer); b.classList.remove("holding","pressed"); }
+  b.addEventListener("pointerdown",start); b.addEventListener("pointerup",stop); b.addEventListener("pointerleave",stop); b.addEventListener("pointercancel",stop);
+  b.addEventListener("contextmenu",function(e){e.preventDefault();});
+}
+function fazerCarimbo(){
+  var c={nome:"Baile Tinta Fresca",bairro:"LAPA",data:"07 NOV",hora:"23H40",cor:"rosa",forma:"redondo",giro:-6};
+  var antes=paginasCompletas(S.carimbos.length);
+  S.carimbos.push(c); S.checkinHoje=true; S.fidelidade=Math.min(5,S.fidelidade+1);
+  S.noite={ev:"baile", desde:"23H40"};
+  var slot=document.getElementById("nextslot"), stage=document.getElementById("stage");
+  if(slot){
+    slot.classList.remove("empty","next"); slot.innerHTML=stampSVG(c,"bate-in vazar");
+    setTimeout(function(){
+      stage.classList.add("thud");
+      var sr=slot.getBoundingClientRect(), gr=stage.getBoundingClientRect();
+      for(var i=0;i<7;i++){
+        var a=i/7*Math.PI*2+Math.random()*.5, d=46+Math.random()*34, s=8+Math.random()*16;
+        var el=document.createElement("div"); el.innerHTML=blobSVG("rosa",90+i,"width:"+s+"px","");
+        var sp=el.firstChild; sp.classList.add("respingo");
+        sp.style.left=(sr.left-gr.left+sr.width/2-s/2)+"px"; sp.style.top=(sr.top-gr.top+sr.height/2-s/2)+"px";
+        sp.style.setProperty("--dx",Math.cos(a)*d+"px"); sp.style.setProperty("--dy",Math.sin(a)*d+"px");
+        stage.querySelector(".book").appendChild(sp);
+      }
+    }, 220);
+  }
+  var completou = paginasCompletas(S.carimbos.length) > antes;
+  S.ultimoCompletou = completou ? NIV[antes] : null;
+  if(completou){
+    S.pontos += BONUS_PAGINA;
+    if(!S.carteira.some(function(x){return x.id===NIV[antes].id;})) S.carteira.unshift({id:NIV[antes].id, tk:"t-rosa", kind:"Passaporte · página "+(antes+1), titulo:NIV[antes].b, onde:"Qualquer festa parceira", novo:true});
+    S.novos[NIV[antes].id]=true;
+  }
+  var cta=document.getElementById("ckCta");
+  setTimeout(function(){ if(cta) cta.innerHTML='<button class="btn full big lc bate" style="--r:0deg" type="button" data-act="aposCarimbo">Continuar</button>'; }, 900);
+  updateChrome();
+}
+R.progresso = function(){
+  var total=S.carimbos.length, info=nivelInfo(total), comp=S.ultimoCompletou;
+  var dots=""; for(var i=0;i<info.n;i++) dots+='<i class="'+(i<info.feitos?"on":"")+'"></i>';
+  var top = comp ?
+    '<div class="center"><div style="width:150px;margin:0 auto" class="bate">'+selo("PÁGINA "+(NIV.indexOf(comp)+1),"COMPLETA","rosa",-10)+'</div></div>'+
+    '<h1 class="h-disp center mt16 st" style="--i:1">Página completa.</h1><p class="lead center mt8 st" style="--i:2">Você destravou um benefício e ganhou '+BONUS_PAGINA+' pontos.</p>'+
+    '<div class="mt24">'+ticketHTML({tk:"t-rosa", kind:"Passaporte · página "+(NIV.indexOf(comp)+1), no:"NOVO", titulo:comp.b, p:"Já está na sua carteira. Use com a noite ativa.", code:"PP·0"+(NIV.indexOf(comp)+1), r:-1.5, i:3, novo:true, go:"carteira"})+'</div>'+
+    '<div class="row-gap mt16" style="justify-content:center"><span class="tag lima bate" style="--r:-3deg;--d:600">+'+BONUS_PAGINA+' pontos</span></div>'
+    :
+    '<div class="center av-bob" style="width:130px;margin:0 auto">'+avatar("feliz")+'</div>'+
+    '<h1 class="h-disp center mt16 st" style="--i:1">Carimbado.</h1>'+
+    '<p class="lead center mt8 st" style="--i:2">Faltam '+plural(info.falta,"carimbo","carimbos")+' para: '+(info.nivel.sug?"o próximo nível":info.nivel.b.toLowerCase())+'.</p>'+
+    '<div class="dots mt24 st" style="--i:3;justify-content:center">'+dots+'</div>';
+  return {noTab:true, noNight:true, cls:"notab", html:
+    '<div class="glow" style="--glow:var(--tinta-lima);--gx:50%"></div>'+
+    vblobs([["lima",-20,40,160,0,10],["ciano",70,0,180,0,13]])+
+    '<div style="height:20px"></div>'+top+
+    '<p class="small muted center mt32 st" style="--i:4">Amanhã a gente pergunta como foi. Rende pontos.</p>'+
+    '<button class="btn full big mt16" type="button" data-act="irNoiteCk">Ver benefícios da noite</button>'};
+};
+R.perguntas = function(origem){
+  var Q=[["lot","Como estava a lotação",["Vazio","Tranquilo","Cheio","Lotado"]],["gasto","Quanto você gastou",["Até R$ 50","R$ 50 a 100","R$ 100 a 200","Mais de R$ 200"]],["hora","Que horas você chegou",["Antes das 22h","22h a 0h","0h a 2h","Depois das 2h"]]];
+  S.resp=S.resp||{};
+  var n=Object.keys(S.resp).length;
+  return {noTab:true, noNight:true, cls:"notab", html:
+    '<div class="glow" style="--glow:var(--tinta-ciano);--gx:10%"></div>'+
+    '<div class="topbar">'+backBtn("Fechar")+'<span class="mono small muted" id="qn">'+n+' de 3</span></div>'+
+    header("Baile Tinta Fresca","Como foi?","ol")+
+    '<p class="lead mt8">Um toque em cada. Tudo é pulável.</p>'+
+    Q.map(function(q,qi){ return '<div class="q st" style="--i:'+(qi+2)+'"><div class="mono"><span>'+q[1]+'</span><span>'+(qi+1)+'/3</span></div><div class="opts">'+
+      q[2].map(function(o){ return '<button class="chip lima" type="button" data-act="resp" data-arg="'+q[0]+'|'+o+'" aria-pressed="'+(S.resp[q[0]]===o)+'">'+o+'</button>'; }).join("")+'</div></div>'; }).join("")+
+    '<button class="btn full big mt32" id="qsend" type="button" data-act="enviarPerguntas" data-arg="'+(origem||"")+'"'+(n<3?' disabled':'')+'>Enviar <span class="b-pts">+5 PTS</span></button>'+
+    '<button class="btn full ghost mt12" type="button" data-act="pularPerguntas" data-arg="'+(origem||"")+'">Pular</button>'};
+};
+
+/* ---------- noite ativa ---------- */
+R.noite = function(){
+  if(!S.noite) return R.semNoite();
+  var e=EV[S.noite.ev], fd="";
+  for(var i=0;i<5;i++) fd+='<i class="'+(i<S.fidelidade?"on":"")+'">'+(i<S.fidelidade?stampSVG({nome:"Galpão",bairro:"LAPA",data:"✓",hora:"",cor:i===S.fidelidade-1?"rosa":"azul",forma:"redondo",giro:(i*37%20)-10}).replace('font-size="15"','font-size="0"'):'')+'</i>';
+  var usaveis=S.carteira.filter(function(c){return !c.usado;});
+  return {tab:null, html:
+    '<div class="glow" style="--glow:var(--tinta-laranja);--gx:85%"></div>'+
+    vblobs([["laranja",62,-40,220,10,12],["rosa",-24,120,110,0,15]])+
+    '<div class="topbar">'+backBtn()+'<span class="tag lar" style="--r:2deg">Ao vivo · desde '+S.noite.desde+'</span></div>'+
+    header("Noite ativa · "+e.local,e.nome,"oo")+
+    '<div class="sec"><div class="sh"><h2>Seus benefícios aqui</h2><span>'+plural(1+usaveis.length,"ativo","ativos")+'</span></div><div class="tickets">'+
+      ticketHTML({tk:"t-ciano", kind:"No bar", no:"ATIVO", titulo:"10% no bar", p:"Taxa Carimbo 2%: você fica com 8%. Pague no cartão virtual.", code:"BTF·01", r:-1, i:2, go:"cartao"})+
+      usaveis.map(function(c,i){ return ticketHTML({tk:c.tk||"t-lima", kind:c.kind, no:"CARTEIRA", titulo:c.titulo, p:c.onde, code:"CT·0"+(i+1), r:i%2?-1:1.2, i:3+i, go:"cartao", novo:c.novo}); }).join("")+
+    '</div></div>'+
+    '<div class="sec st" style="--i:5"><div class="card papel fid" style="transform:rotate(.8deg)"><div class="mono small" style="font-size:11px;display:flex;justify-content:space-between;color:#695f5a"><span>CARTÃO FIDELIDADE</span><span>GALPÃO RIACHUELO</span></div>'+
+      '<div class="h-sub mt8">Faltam '+plural(5-S.fidelidade,"visita","visitas")+' para: entrada grátis</div><div class="fd">'+fd+'</div></div></div>'+
+    '<div class="flexcol mt32">'+
+      '<button class="btn full big" type="button" data-go="cartao">Pagar no bar com o cartão virtual</button>'+
+      '<button class="btn full big lc" type="button" data-act="volta99">Voltar com 99</button>'+
+      '<button class="link" type="button" data-act="encerrarNoite">Encerrar a noite</button>'+
+    '</div>'};
+};
+R.semNoite = function(){
+  return {tab:null, html:'<div class="topbar">'+backBtn()+'</div>'+header("Noite ativa","Nada rolando.")+'<p class="lead mt12">A noite ativa aparece quando você faz check-in numa festa.</p><button class="btn full big mt24" type="button" data-act="checkin">Fazer check-in</button>'};
+};
+R.cartao = function(){
+  var conta=80, desc=conta*.10, taxa=conta*.02, paga=conta-desc+taxa;
+  return {noTab:true, cls:"notab", noNight:true, html:
+    '<div class="glow" style="--glow:var(--tinta-ciano);--gx:20%"></div>'+
+    '<div class="topbar">'+backBtn()+'<span class="mono small muted">BAR · GALPÃO RIACHUELO</span></div>'+
+    header("Cartão virtual","No bar.")+
+    '<div class="mt24 st" style="--i:2"><div class="vcard" id="vcard">'+
+      blobSVG("rosa",61,"width:240px;right:-70px;top:-80px;position:absolute","pb")+blobSVG("ciano",62,"width:170px;right:10px;top:30px;position:absolute","pb")+
+      '<div class="vc-top"><span>CARTÃO VIRTUAL</span><span>10% ATIVO</span></div><div><div class="vc-n">•••• 4021</div><div class="mono small mt8" style="font-size:11px">LU NA NOITE · 11/28</div></div><div class="vc-brand">Carimbo</div>'+
+      '<span class="nfc"></span><span class="pago" id="pago">'+(S.pago?selo("PAGO","00H52","azul",-14):'')+'</span></div></div>'+
+    '<div class="card papel mt24 st" style="--i:3"><div class="kv"><span>Conta no bar</span><span>'+brl(conta)+'</span></div><div class="kv"><span>Desconto do lugar (10%)</span><span>− '+brl(desc)+'</span></div>'+
+      '<div class="kv"><span>Taxa Carimbo (2%)</span><span>+ '+brl(taxa)+'</span></div><div class="kv total"><span style="color:#020202">Você paga</span><span>'+brl(paga)+'</span></div>'+
+      '<p class="small mt8" style="color:#695f5a">Economia líquida de '+brl(desc-taxa)+' (8%). A taxa é cobrada no próprio cartão.</p></div>'+
+    '<div class="mt24" id="payCta">'+(S.pago?'<button class="btn full big lc" type="button" data-back>Voltar para a noite</button>':'<button class="btn full big" type="button" data-act="pagar">Aproximar do caixa</button>')+'</div>'};
+};
+
+/* ---------- pós-evento ---------- */
+R.pos = function(){
+  var e=EV.baile;
+  return {noTab:true, noNight:true, cls:"notab", html:
+    '<div class="glow" style="--glow:var(--tinta-ciano);--gx:50%"></div>'+
+    '<div class="topbar">'+backBtn("Fechar")+'<span class="mono small muted">SÁB 08 NOV · 11H20</span></div>'+
+    '<div class="center av-bob" style="width:150px;margin:0 auto">'+avatar("ressaca")+'</div>'+
+    '<h1 class="h-disp center mt16 st" style="--i:0">Bom dia.<br>Como foi ontem?</h1>'+
+    '<p class="lead center mt8 st" style="--i:1">'+e.nome+' · '+e.local+'</p>'+
+    (S.perguntasPend? '<button class="card rough mt24 st" type="button" data-go="perguntas/pos" style="--i:2;display:flex;width:100%;text-align:left;align-items:center;gap:12px"><div style="flex:1"><div class="mono small" style="font-size:11px;color:var(--tinta-lima)">PENDENTE · +5 PONTOS</div><div class="h-sub mt8">3 perguntas rápidas</div><div class="small muted">Lotação, gasto e horário.</div></div><span class="mono small muted">Abrir</span></button>':'')+
+    '<div class="sec st" style="--i:3"><div class="sh"><h2>Sua review</h2><span>+10 pontos</span></div>'+
+      '<textarea class="field" id="revtxt" placeholder="Conta pra quem vai na próxima: fila, som, bar, banheiro…">'+(S.revTxt||"")+'</textarea>'+
+    '</div>'+
+    '<p class="small muted mt16">Reviews aparecem por data, as mais recentes primeiro. Cada “isso ajudou” que você receber rende +1 ponto.</p>'+
+    '<button class="btn full big mt24" type="button" data-act="publicarReview">Publicar review <span class="b-pts">+10 PTS</span></button>'+
+    '<button class="btn full ghost mt12" type="button" data-act="pularReview">Agora não</button>'};
+};
+
+/* ---------- passaporte ---------- */
+R.passaporte = function(){
+  var total=S.carimbos.length, info=nivelInfo(total);
+  var pg = S.pageView==null ? info.pag : S.pageView;
+  var vazio = total===0;
+  return {tab:"passaporte", html:
+    '<div class="glow" style="--glow:var(--tinta-lima);--gx:90%"></div>'+
+    vblobs([["lima",66,-50,210,0,10],["rosa",-26,60,110,0,9]])+
+    header("Clássicos · "+S.mes.toLowerCase(),"Passaporte","ol")+
+    '<p class="lead mt8 st" style="--i:2">'+(vazio?'Passaporte novo em folha. O primeiro carimbo do mês está esperando você.':plural(total,"carimbo","carimbos")+' em '+S.mes.split(" ")[0].toLowerCase()+'. Zera todo mês, e os antigos ficam guardados.')+'</p>'+
+    '<div class="mt24 st" style="--i:3" id="bookwrap">'+bookHTML(S.carimbos, pg, {noNext:true, turn:S.turn||""})+'</div>'+
+    '<div class="pager"><button class="backbtn" type="button" data-act="pag" data-arg="-1"'+(pg===0?' style="visibility:hidden"':'')+'>Página anterior</button><span class="mono">'+(pg+1)+' / '+NIV.length+'</span><button class="backbtn" type="button" data-act="pag" data-arg="1"'+(pg===NIV.length-1?' style="visibility:hidden"':'')+'>Próxima</button></div>'+
+    '<div class="sec st" style="--i:4"><div class="sh"><h2>Cada página completa rende</h2><span>Fica mais difícil</span></div>'+reguaHTML(total)+'</div>'+
+    '<div class="sec st" style="--i:5"><div class="sh"><h2>Passaportes anteriores</h2><span>'+S.arquivo.length+'</span></div><div class="oldbooks">'+
+      S.arquivo.map(function(k,i){ var a=ARQUIVO[k]; return '<button class="oldbook" type="button" data-go="arquivo/'+k+'" style="--c:var(--tinta-'+(["ciano","laranja","lima","rosa"][i%4])+');--r:'+(i%2?2:-2)+'deg"><span>PASSAPORTE</span><b>'+a.mes.split(" ")[0]+'<br>'+a.mes.split(" ")[1]+'</b><span>'+plural(a.carimbos.length,"CARIMBO","CARIMBOS")+'</span></button>'; }).join("")+
+      '<button class="oldbook wr" type="button" data-act="wrapped" style="--r:1deg"><span>DEPOIS</span><b>Wrapped</b><span>IMAGEM DO MÊS</span></button>'+
+    '</div></div>', after:function(){ S.turn=""; }};
+};
+R.arquivo = function(k){
+  var a=ARQUIVO[k]||ARQUIVO.out, pg=S.arqPage||0;
+  return {tab:"passaporte", html:
+    '<div class="glow" style="--glow:var(--tinta-ciano);--gx:10%"></div>'+
+    '<div class="topbar">'+backBtn()+'<span class="tag cin">Arquivado</span></div>'+
+    header("Passaporte anterior",a.mes.split(" ")[0]+" "+a.mes.split(" ")[1])+
+    '<p class="lead mt8">'+plural(a.carimbos.length,"carimbo","carimbos")+', '+plural(paginasCompletas(a.carimbos.length),"página completa","páginas completas")+'.</p>'+
+    '<div class="mt24" id="bookwrap">'+bookHTML(a.carimbos, pg, {arquivo:true, mes:a.mes, turn:S.turn||""})+'</div>'+
+    '<div class="pager"><button class="backbtn" type="button" data-act="arqPag" data-arg="-1|'+k+'"'+(pg===0?' style="visibility:hidden"':'')+'>Página anterior</button><span class="mono">'+(pg+1)+' / 2</span><button class="backbtn" type="button" data-act="arqPag" data-arg="1|'+k+'"'+(pg>=1?' style="visibility:hidden"':'')+'>Próxima</button></div>',
+    after:function(){ S.turn=""; }};
+};
+
+/* ---------- benefícios (loja) ---------- */
+R.beneficios = function(){
+  var total=S.carimbos.length, info=nivelInfo(total);
+  var troca = S.lojaVazia ? '<div class="card center st" style="--i:4"><div style="width:90px;margin:0 auto">'+avatar("ok")+'</div><p class="h-sub mt12">Loja vazia por aqui</p><p class="muted mt8">Nenhum lugar perto de você tem benefício ainda. A gente avisa quando tiver.</p><button class="btn ghost mt16" type="button" data-tab="explorar">Explorar mesmo assim</button></div>' :
+    '<div class="tickets">'+TROCA.map(function(t,i){
+      var s=lojaItemState(t);
+      return ticketHTML({tk:t.tk, kind:t.kind, no:t.validade.toUpperCase(), titulo:t.titulo, p:t.onde, price:s.res?"RESGATADO":(s.tem?t.pts+" PONTOS":"FALTAM "+s.falta+" PONTOS"), falta:!s.tem&&!s.res, code:t.id.toUpperCase()+"·"+t.pts, r:i%2?1.2:-1.2, i:i+4, go:"beneficio/"+t.id,
+        seal:s.res?selo("RESGATADO","NA CARTEIRA","azul",-12):""});
+    }).join("")+'</div>';
+  var acc=0, bloq=NIV.filter(function(n){return !n.sug;}).map(function(nv,i){
+    acc+=nv.n; var ok=total>=acc, falta=acc-total;
+    return ticketHTML({locked:!ok, tk:"t-rosa", kind:"Passaporte · página "+(i+1), no:nv.n+" CARIMBOS", titulo:nv.b, p:ok?"Desbloqueado. Já está na sua carteira.":"Faltam "+plural(falta,"carimbo","carimbos")+" para destravar.",
+      price:ok?"+"+BONUS_PAGINA+" PONTOS JUNTO":"BLOQUEADO", code:"PP·0"+(i+1), r:i%2?-1:1, i:i+7, act:ok?"":"bloqueado", arg:String(falta), go:ok?"carteira":"", novo:ok&&S.novos[nv.id]});
+  }).join("");
+  return {tab:"beneficios", html:
+    '<div class="glow" style="--glow:var(--tinta-rosa);--gx:95%"></div>'+
+    vblobs([["rosa",68,-40,190,0,16],["lima",-24,90,110,0,6]])+
+    header("Loja de descontos","Benefícios")+
+    '<div class="card mt24 st" style="--i:2"><div class="saldo"><span class="num" id="ptsnum">'+S.pontos+'</span><span class="lbl">pontos<br>para trocar</span></div>'+
+      '<p class="small muted mt8">100 pontos = R$ 10 de desconto.</p>'+
+      '<div class="ganhos"><div><b>+5</b><span>perguntas</span></div><div><b>+10</b><span>review</span></div><div><b>+1</b><span>por like</span></div><div><b>+'+BONUS_PAGINA+'</b><span>página</span></div></div>'+
+      '<button type="button" data-tab="passaporte" style="display:block;width:100%;text-align:left;margin-top:16px"><div style="display:flex;justify-content:space-between" class="small"><span>Página '+(info.pag+1)+' do passaporte</span><span class="mono muted" style="font-size:11px">'+info.feitos+' DE '+info.n+'</span></div>'+
+      '<div class="bar mt8"><i style="width:'+(info.feitos/info.n*100)+'%"></i></div></button></div>'+
+    '<div class="sec"><div class="sh"><h2>Troque agora</h2><span>Com pontos</span></div>'+troca+'</div>'+
+    '<div class="sec"><div class="sh"><h2>Pelo passaporte</h2><span>Por carimbos</span></div><div class="tickets">'+bloq+'</div></div>'};
+};
+R.beneficio = function(id){
+  var t=TROCA.filter(function(x){return x.id===id;})[0]||TROCA[0], s=lojaItemState(t);
+  return {tab:"beneficios", cls:"notab", noTab:true, noNight:true, html:
+    '<div class="glow" style="--glow:var(--tinta-'+t.tk.slice(2)+');--gx:80%"></div>'+
+    '<div class="topbar">'+backBtn()+'<span class="mono small muted">'+S.pontos+' PONTOS</span></div>'+
+    '<div class="mt8">'+ticketHTML({tk:t.tk, kind:t.kind, no:t.validade.toUpperCase(), titulo:t.titulo, p:t.onde, code:t.id.toUpperCase()+"·"+t.pts, r:-1.5, i:0, seal:s.res?selo("RESGATADO","NA CARTEIRA","azul",-12,"bate"):""})+'</div>'+
+    '<div class="card mt24 st" style="--i:1"><div class="kv dark"><span>Onde</span><span>'+t.onde+'</span></div><div class="kv dark"><span>Validade</span><span>'+t.validade+'</span></div>'+
+      '<div class="kv dark"><span>Como usar</span><span style="text-align:right">Com a noite ativa, no cartão virtual</span></div><div class="kv dark"><span>Valores</span><span style="text-align:right;max-width:62%">'+t.val+'</span></div>'+
+      '<div class="kv dark total"><span>Custa</span><span>'+t.pts+' pontos</span></div></div>'+
+    '<div class="mt24">'+(s.res? '<button class="btn full big lc" type="button" data-go="carteira">Ver na carteira</button>' :
+      s.tem? '<button class="btn full big" type="button" data-act="resgatar" data-arg="'+t.id+'">Resgatar por '+t.pts+' pontos</button>' :
+      '<button class="btn full big" type="button" disabled>Faltam '+s.falta+' pontos</button><p class="small muted mt12 center">Avaliar a última festa rende até 15 pontos.</p><button class="btn full ghost mt12" type="button" data-act="comoGanhar">Como ganhar pontos</button>')+'</div>'};
+};
+
+/* ---------- você ---------- */
+R.voce = function(){
+  var total=S.carimbos.length;
+  return {tab:"voce", html:
+    '<div class="glow" style="--glow:var(--tinta-ciano);--gx:50%"></div>'+
+    vblobs([["ciano",62,-30,200,0,17],["laranja",-20,160,100,0,12]])+
+    '<div class="center st" style="--i:0"><div class="av-bob" style="width:140px;margin:10px auto 0">'+avatar(S.noite?"feliz":"ok")+'</div>'+
+      '<h1 class="h-disp mt12">'+(S.conta?"Lu":"Visitante")+'</h1><p class="mono small muted mt8" style="font-size:12px">'+(S.conta?"@LU.NA.NOITE · DESDE SET 2026":"SEM CONTA AINDA")+'</p></div>'+
+    '<div class="stats mt24 st" style="--i:1"><div class="stat center"><span class="mono">Pontos</span><b>'+S.pontos+'</b></div><div class="stat center"><span class="mono">Carimbos</span><b>'+total+'</b></div><div class="stat center"><span class="mono">Reviews</span><b>'+(S.minhaReview?4:3)+'</b></div></div>'+
+    (!S.conta?'<div class="card mt16"><p>Você está navegando sem conta. Ela só é pedida quando você fizer check-in ou usar um voucher.</p><button class="btn sm mt12" type="button" data-act="cadastroSheet">Criar conta agora</button></div>':'')+
+    '<div class="list mt24 st" style="--i:2">'+
+      '<button class="li" type="button" data-go="carteira"><span>Carteira de benefícios<span class="sub">'+plural(S.carteira.length,"benefício pronto","benefícios prontos")+' para usar</span></span><span class="go">ABRIR</span></button>'+
+      '<button class="li" type="button" data-go="avatar">Seu avatar<span class="go">TINTA</span></button>'+
+      '<button class="li" type="button" data-go="amigos">Adicionar amigo<span class="go">LISTAS</span></button>'+
+      '<button class="li" type="button" data-go="privacidade">Privacidade<span class="go">OPT-INS</span></button>'+
+      '<button class="li" type="button" data-go="termos">Termos de uso<span class="go">LER</span></button>'+
+    '</div>'+
+    '<button class="link mt16" type="button" data-act="roteiro">Roteiro e estados do protótipo</button>'};
+};
+R.carteira = function(){
+  var c=S.carteira;
+  return {tab:"voce", html:
+    '<div class="glow" style="--glow:var(--tinta-lima);--gx:85%"></div>'+
+    '<div class="topbar">'+backBtn()+'</div>'+
+    header("Prontos para usar","Carteira","ol")+
+    (c.length? '<div class="tickets mt24">'+c.map(function(x,i){ return ticketHTML({tk:x.tk||"t-lima", kind:x.kind, no:x.voucher?"VOUCHER":"PRONTO", titulo:x.titulo, p:x.onde, code:"CT·0"+(i+1), r:i%2?1.2:-1.2, i:i+2, act:"usar", arg:x.id, novo:x.novo}); }).join("")+'</div>'+
+      '<p class="small muted mt16">Na festa, com a noite ativa, os benefícios aparecem no cartão virtual.</p>'
+      : '<div class="card mt24 center"><p class="h-sub">Nada aqui ainda</p><p class="muted mt8">Troque pontos na loja ou complete uma página do passaporte.</p><button class="btn ghost mt16" type="button" data-tab="beneficios">Ir para a loja</button></div>')};
+};
+R.avatar = function(origem){
+  var inks=["rosa","laranja","lima","ciano"];
+  return {noTab:true, noNight:true, cls:"notab", html:
+    '<div class="glow" style="--glow:var(--tinta-'+S.avatarInk+');--gx:50%"></div>'+
+    '<div class="topbar">'+(origem==="ck"?'<span></span><button class="backbtn" type="button" data-act="avatarPronto" data-arg="ck">Pular</button>':backBtn())+'</div>'+
+    '<div class="eyebrow center">Seu avatar</div><h1 class="h-disp center">Esse é você na noite.</h1>'+
+    '<div class="av-bob" style="width:180px;margin:28px auto 0" id="avbig">'+avatar("ok")+'</div>'+
+    '<div class="avpick mt24">'+inks.map(function(k){return '<button type="button" style="--c:var(--tinta-'+k+')" aria-label="Tinta '+k+'" data-act="avInk" data-arg="'+k+'|'+(origem||"")+'" aria-pressed="'+(S.avatarInk===k)+'"></button>';}).join("")+'</div>'+
+    '<div class="card mt32"><div class="mono small muted" style="font-size:11px">ELE MUDA COM A SUA NOITE</div><div style="display:flex;justify-content:space-around;margin-top:12px;text-align:center" class="small muted">'+
+      '<div><div style="width:64px;margin:0 auto">'+avatar("ok")+'</div>Em casa</div><div><div style="width:64px;margin:0 auto">'+avatar("feliz")+'</div>Carimbou</div><div><div style="width:64px;margin:0 auto">'+avatar("ressaca")+'</div>Dia seguinte</div></div></div>'+
+    '<button class="btn full big mt24" type="button" data-act="avatarPronto" data-arg="'+(origem||"")+'">Pronto</button>'};
+};
+R.amigos = function(){
+  var L=S.listas;
+  return {tab:"voce", html:
+    '<div class="glow" style="--glow:var(--tinta-laranja);--gx:10%"></div>'+
+    '<div class="topbar">'+backBtn()+'</div>'+
+    header("Para sair junto","Amigos","oo")+
+    '<p class="lead mt8">Crie uma lista, tipo “pré de sexta”, e chame quem vai com você.</p>'+
+    (L.length? '<div class="list mt24">'+L.map(function(l){return '<div class="li"><span>'+l.nome+'<span class="sub">'+plural(l.n,"pessoa","pessoas")+'</span></span><div class="faces" style="margin-left:auto">'+face(35,"lima")+face(32,"ciano")+face(31,"laranja")+'</div></div>';}).join("")+'</div>':'')+
+    '<div class="card mt24"><label class="mono small muted" for="lnome" style="font-size:11px">NOVA LISTA</label><input class="field mt8" id="lnome" value="Pré de sexta"><button class="btn full mt12" type="button" data-act="criarLista">Criar lista e importar contatos</button></div>'};
+};
+R.contatos = function(){
+  S.sel=S.sel||{"Bia Moraes":true,"Caio R.":true,"Nanda":true};
+  var n=Object.keys(S.sel).filter(function(k){return S.sel[k];}).length;
+  return {tab:"voce", cls:"notab", noTab:true, html:
+    '<div class="topbar">'+backBtn()+'<span class="mono small muted">'+(S.novaLista||"Pré de sexta").toUpperCase()+'</span></div>'+
+    header("Importar contatos","Quem vai?")+
+    '<p class="lead mt8">Quem já está no Carimbo aparece marcado.</p>'+
+    '<div class="card mt24">'+CONTATOS.map(function(c){ var on=!!S.sel[c[0]]; return '<button class="ct" type="button" data-act="selCt" data-arg="'+c[0]+'" aria-pressed="'+on+'">'+face(c[1],c[2])+'<span>'+c[0]+'<span class="sub small muted" style="display:block">'+(c[3]?"No Carimbo":"Convidar por mensagem")+'</span></span><span class="ck"></span></button>'; }).join("")+'</div>'+
+    '<button class="btn full big mt24" type="button" data-act="addLista"'+(n?'':' disabled')+'>Adicionar '+plural(n,"pessoa","pessoas")+'</button>'};
+};
+R.privacidade = function(){
+  function sw(k,label,sub){ var on=k==="optin"?S.optin:S.pv[k]; return '<div class="li"><span>'+label+'<span class="sub">'+sub+'</span></span><button class="sw" type="button" role="switch" aria-checked="'+on+'" data-act="sw" data-arg="'+k+'" aria-label="'+label+'" style="margin-left:auto"></button></div>'; }
+  return {tab:"voce", html:
+    '<div class="topbar">'+backBtn()+'</div>'+
+    header("Você decide o que aparece","Privacidade")+
+    '<div class="list mt24">'+sw("optin","Aparecer em “quem vai”","Outras pessoas veem que você vai ao evento")+sw("amigos","Amigos veem meus carimbos","Só quem está nas suas listas")+
+      sw("recs","Usar minhas respostas","Lotação, gasto e horário melhoram as recomendações")+sw("notif","Avisos no dia seguinte","Lembrete para avaliar a festa")+'</div>'+
+    '<p class="small muted mt16">Tudo que é público começa desligado. Você pode mudar quando quiser.</p>'};
+};
+R.termos = function(){
+  return {tab:"voce", html:'<div class="topbar">'+backBtn()+'</div>'+header("Versão de 07 nov 2026","Termos de uso")+
+    '<div class="card mt24"><p class="h-sub">O que a gente guarda</p><p class="muted mt8">Onde você fez check-in, suas respostas e reviews. A localização só é lida quando você aperta “Check-in”.</p>'+
+    '<p class="h-sub mt16">O que é público</p><p class="muted mt8">Só o que você ligou em Privacidade. Reviews aparecem com seu nome de usuário.</p>'+
+    '<p class="h-sub mt16">Taxas</p><p class="muted mt8">Em cada benefício usado, o Carimbo cobra uma taxa menor que o desconto, sempre mostrada antes de pagar.</p></div>'+
+    '<p class="small muted mt16">Texto provisório do protótipo.</p>'};
+};
+
+/* =====================================================================
+   ROTEADOR
+   ===================================================================== */
+var stack=[], cur=null, viewsEl=document.getElementById("views");
+function parse(route){ var i=route.indexOf("/"); return i<0?[route,null]:[route.slice(0,i),route.slice(i+1)]; }
+function build(route){
+  var p=parse(route), fn=R[p[0]]||R.explorar, out=fn(p[1]);
+  var el=document.createElement("section"); el.className="view "+(out.cls||""); el.innerHTML=out.html; el.dataset.route=route;
+  return {el:el, out:out};
+}
+function show(route, anim){
+  var b=build(route), old=viewsEl.querySelector(".view:not(.leaving)");
+  viewsEl.appendChild(b.el);
+  if(b.out.after) b.out.after(b.el);
+  if(old && anim!=="none"){
+    var inC={push:"in-push",pop:"in-pop",fade:"in-fade",up:"in-up",down:"in-fade"}[anim]||"in-fade";
+    var outC={push:"out-push",pop:"out-pop",fade:"out-fade",up:"out-fade",down:"out-down"}[anim]||"out-fade";
+    b.el.classList.add(inC); old.classList.add(outC,"leaving");
+    setTimeout(function(){ old.remove(); b.el.classList.remove(inC); }, 460);
+  } else if(old){ old.remove(); }
+  cur=route; curOut=b.out;
+  try{ history.replaceState(null,"","#"+route); }catch(e){}
+  updateChrome();
+}
+var curOut={};
+function go(route, o){
+  o=o||{};
+  if(o.replace){ show(route, o.anim||"fade"); return; }
+  if(cur) stack.push(cur);
+  show(route, o.anim||"push");
+}
+function back(){
+  var r=stack.pop();
+  if(!r) r="explorar";
+  show(r,"pop");
+}
+function tab(name){
+  stack.length=0; S.pageView=null;
+  show(name, cur && parse(cur)[0]===name ? "none" : "fade");
+}
+function rerender(){
+  var old=viewsEl.querySelector(".view:not(.leaving)"); if(!old) return;
+  var top=old.scrollTop, b=build(cur);
+  b.el.querySelectorAll(".st,.bate").forEach(function(n){ n.classList.remove("st","bate"); });
+  viewsEl.replaceChild(b.el, old); b.el.scrollTop=top;
+  if(b.out.after) b.out.after(b.el);
+  curOut=b.out; updateChrome();
+}
+function updateChrome(){
+  var tb=document.getElementById("tabbar"), nb=document.getElementById("nightbar");
+  tb.classList.toggle("hide", !!curOut.noTab);
+  tb.querySelectorAll(".tab").forEach(function(t){ t.setAttribute("aria-selected", String(t.dataset.tab===curOut.tab)); });
+  var showNight = !!S.noite && !curOut.noNight && !curOut.noTab && parse(cur||"")[0]!=="noite";
+  nb.classList.toggle("hide", !showNight);
+  if(S.noite){
+    var n=1+S.carteira.filter(function(c){return !c.usado;}).length;
+    nb.innerHTML='<span class="nb-dot"></span><div><span>Noite ativa · desde '+S.noite.desde+'</span><b>'+EV[S.noite.ev].nome+'</b></div><span class="nb-go">'+plural(n,"benefício","benefícios")+'</span>';
+  }
+  var views=viewsEl.querySelectorAll(".view");
+  views.forEach(function(v){ v.classList.toggle("night", showNight && !v.classList.contains("notab")); });
+}
+
+/* =====================================================================
+   SHEET, ALERTA, TOAST
+   ===================================================================== */
+var sheet=document.getElementById("sheet"), panel=document.getElementById("panel");
+function openSheet(html, alert){ panel.innerHTML=html; sheet.classList.toggle("alert",!!alert); requestAnimationFrame(function(){ sheet.classList.add("open"); }); }
+function closeSheet(){ sheet.classList.remove("open"); }
+function iosAlert(title, text, buttons, map){
+  openSheet((map?'<div class="ios-map">'+mapaMini()+'</div>':'')+'<div class="ios-a"><b>'+title+'</b><p>'+text+'</p></div>'+buttons.map(function(b){ return '<button class="ios-b'+(b[2]?" strong":"")+'" type="button" data-act="'+b[1]+'">'+b[0]+'</button>'; }).join(""), true);
+}
+function mapaMini(){ return '<svg viewBox="0 0 240 120" width="100%" height="100%"><g fill="none" stroke="#5a5363" stroke-width="2"><path d="M0 80Q80 40 140 70T240 30"/><path d="M60 0Q90 60 70 120"/><path d="M170 0L190 120"/></g><circle cx="120" cy="62" r="22" fill="#0a84ff" opacity=".25"/><circle cx="120" cy="62" r="7" fill="#0a84ff" stroke="#fff" stroke-width="2.5"/></svg>'; }
+var toastEl=document.getElementById("toast");
+function toast(txt, badge){
+  var t=document.createElement("div"); t.className="toast"; t.innerHTML=(badge?'<b>'+badge+'</b>':'')+'<span>'+txt+'</span>';
+  toastEl.innerHTML=""; toastEl.appendChild(t);
+  setTimeout(function(){ t.classList.add("out"); }, 2200);
+  setTimeout(function(){ if(t.parentNode) t.remove(); }, 2600);
+}
+function pontos(delta, txt){ S.pontos+=delta; toast(txt, (delta>0?"+":"")+delta+" PTS"); }
+
+/* =====================================================================
+   AÇÕES
+   ===================================================================== */
+var A = {};
+A.closeSheet=closeSheet;
+A.explorarSemConta=function(){ stack.length=0; show("explorar","fade"); };
+A.jaTenhoConta=function(){ recorrente(); stack.length=0; show("explorar","fade"); toast("Que bom te ver de novo, Lu"); };
+A.aplicarVoucher=function(){ S.voucher="BIA15"; S.carteira.push({id:"v1", tk:"t-rosa", kind:"Voucher · @bia.na.noite", titulo:"15% off no 1º ingresso", onde:"Qualquer festa parceira · até 30 NOV", voucher:true}); rerenderAnim(); };
+function rerenderAnim(){ show(cur,"none"); }
+A.comecar=function(){ stack.length=0; show("explorar","fade"); };
+A.exMode=function(m){ S.exMode=m; rerender(); };
+A.filtro=function(f){ S.filtro=f; rerender(); };
+A.mapPin=function(k){ var mc=document.getElementById("mapcard"); if(mc){ mc.innerHTML=mapCard(k); mc.firstChild.classList.add("bate"); mc.firstChild.style.setProperty("--r","0deg"); } };
+A.salvar=function(k){ S.salvos[k]=!S.salvos[k]; rerender(); toast(S.salvos[k]?"Salvo. A gente avisa quando estiver perto.":"Removido dos salvos"); };
+A.ajudou=function(k, el){ S.ajudou[k]=!S.ajudou[k]; el.setAttribute("aria-pressed", String(S.ajudou[k])); var b=el.querySelector("b"); b.textContent=(+b.textContent)+(S.ajudou[k]?1:-1); if(S.ajudou[k]) toast("Quem escreveu ganhou +1 ponto"); };
+A.comoUsar=function(){ openSheet('<div class="sh-t">Como usar</div><p class="muted">Faça check-in quando chegar. O benefício entra na sua noite ativa e é aplicado quando você paga no cartão virtual. O desconto, a taxa e o valor final aparecem antes de pagar.</p><button class="btn full big mt24" type="button" data-act="closeSheet">Entendi</button>'); };
+A.comprar=function(k){ var e=EV[k];
+  openSheet('<div class="sh-t">'+(e.preco==="Grátis"?"Presença confirmada":"Ingresso na ticketeira oficial")+'</div><p class="muted">'+(e.preco==="Grátis"?"É de graça. Vamos te lembrar no dia, e o check-in no local rende carimbo.":"O Carimbo não vende ingressos. Você vai para a ticketeira oficial do "+e.nome+(S.voucher?", e o seu voucher BIA15 vai junto.":".")) +'</p>'+
+    (e.preco==="Grátis"?'':'<div class="card sunk mt16"><div class="kv dark"><span>Ingresso</span><span>'+e.preco+'</span></div>'+(S.voucher?'<div class="kv dark"><span>Voucher BIA15</span><span>− 15%</span></div>':'')+'</div>')+
+    '<button class="btn full big mt24" type="button" data-act="ticketeira">'+(e.preco==="Grátis"?"Fechar":"Abrir ticketeira")+'</button><button class="btn full ghost mt12" type="button" data-act="closeSheet">Agora não</button>'); };
+A.ticketeira=function(){ closeSheet(); toast("No app real, abre a ticketeira oficial"); };
+A.comoChegar=function(){ toast("No app real, abre o mapa com a rota"); };
+A.optinSheet=function(){ optinSheet(function(){ rerender(); }); };
+function optinSheet(next){
+  A._optNext=next;
+  openSheet('<div style="width:90px;margin:0 auto">'+avatar("feliz")+'</div><div class="sh-t center mt12">Quer aparecer em “quem vai”?</div><p class="muted center">Quem aceitou vê quem mais vai, e você aparece para essas pessoas. Dá para mudar quando quiser em Privacidade.</p>'+
+    '<button class="btn full big mt24" type="button" data-act="optinSim">Sim, quero aparecer</button><button class="btn full ghost mt12" type="button" data-act="optinNao">Agora não</button>');
+}
+A.optinSim=function(){ S.optin=true; S.optinAsked=true; closeSheet(); var n=A._optNext; A._optNext=null; setTimeout(function(){ n&&n(); },250); };
+A.optinNao=function(){ S.optinAsked=true; closeSheet(); var n=A._optNext; A._optNext=null; setTimeout(function(){ n&&n(); },250); };
+
+/* check-in: novo × recorrente */
+A.checkin=function(){
+  if(S.checkinHoje && S.noite){ openSheet('<div class="sh-t">Você já carimbou hoje</div><p class="muted">Um carimbo por festa por dia. Sua noite ativa continua aberta.</p><button class="btn full big mt24" type="button" data-act="irNoite">Ver noite ativa</button>'); return; }
+  if(!S.conta){ A.cadastroSheet(true); return; }
+  passoLocal();
+};
+A.irNoite=function(){ closeSheet(); go("noite"); };
+A.cadastroSheet=function(fromCk){
+  A._ck=fromCk===true;
+  openSheet('<div class="sh-t">Para carimbar, crie sua conta</div><p class="muted">Só o necessário. Leva 10 segundos.</p>'+
+    '<div class="flexcol mt24"><button class="btn full big ghost" type="button" data-act="criarConta">Continuar com Apple</button><button class="btn full big ghost" type="button" data-act="criarConta">Continuar com Google</button><button class="btn full big" type="button" data-act="criarConta">Usar meu celular</button></div>'+
+    '<p class="small muted mt16 center">Ao continuar, você aceita os termos de uso.</p>');
+};
+A.criarConta=function(){ S.conta=true; closeSheet(); toast("Conta criada. Oi, Lu!"); if(A._ck) setTimeout(passoLocal, 400); else rerender(); };
+function passoLocal(){
+  if(!S.locAsked){
+    iosAlert("Permitir que “Carimbo” use sua localização?","Sua localização só é usada para confirmar que você chegou na festa.",[["Permitir uma vez","locOk"],["Permitir ao usar o app","locOk",true],["Não permitir","locNao"]], true);
+    return;
+  }
+  if(!S.optinAsked){ optinSheet(passoLocal); return; }
+  if(!S.avatarAsked){ go("avatar/ck",{anim:"up"}); return; }
+  go("confirmando",{anim:"up"});
+}
+A.locOk=function(){ S.locAsked=true; closeSheet(); setTimeout(passoLocal, 320); };
+A.locNao=function(){ closeSheet(); setTimeout(function(){ openSheet('<div class="sh-t">Sem localização, sem carimbo</div><p class="muted">O check-in confirma que você está na festa. Ative a localização em Ajustes para carimbar.</p><button class="btn full big mt24" type="button" data-act="closeSheet">Entendi</button>'); },320); };
+A.tentarDeNovo=function(){ S.gpsErro=false; show("confirmando","fade"); };
+A.aposCarimbo=function(){ go("progresso",{replace:true}); };
+A.irNoiteCk=function(){ stack.length=0; show("noite","fade"); };
+A.pularPerguntas=function(){ back(); };
+A.resp=function(arg, el){
+  var p=arg.split("|"); S.resp[p[0]]=p[1];
+  el.parentNode.querySelectorAll(".chip").forEach(function(c){ c.setAttribute("aria-pressed", String(c===el)); });
+  var n=Object.keys(S.resp).length; document.getElementById("qn").textContent=n+" de 3";
+  var b=document.getElementById("qsend"); if(n>=3){ b.disabled=false; }
+};
+A.enviarPerguntas=function(origem){
+  S.perguntasFeitas=true; S.perguntasPend=false; pontos(5,"Valeu! Isso ajuda quem ainda vai decidir.");
+  back(); setTimeout(rerender,480);
+};
+A.volta99=function(){
+  openSheet('<div class="row-gap"><span class="tag pat">Parceria 99</span><span class="tag lima" style="--r:1.5deg">15% off na volta</span></div><div class="sh-t mt16">Voltar com 99</div>'+
+    '<div class="card sunk mt12"><div class="kv dark"><span>Saindo de</span><span>Galpão Riachuelo · Lapa</span></div><div class="kv dark"><span>Para</span><span>Casa</span></div><div class="kv dark"><span>Estimativa</span><span>R$ 18 a 22</span></div><div class="kv dark"><span>Com 15% off</span><span>R$ 15 a 19</span></div></div>'+
+    '<p class="small muted mt12">Os motoristas já sabem do movimento por aqui, então a corrida costuma sair rápido.</p>'+
+    '<button class="btn full big lc mt24" type="button" data-act="abrir99">Abrir o 99</button><button class="btn full ghost mt12" type="button" data-act="closeSheet">Agora não</button>');
+};
+A.abrir99=function(){ closeSheet(); toast("No app real, abre o 99 com o destino preenchido"); };
+A.pagar=function(){
+  var vc=document.getElementById("vcard"), cta=document.getElementById("payCta");
+  vc.classList.add("lift"); cta.innerHTML='<button class="btn full big off" type="button">Aproxime do caixa…</button>';
+  setTimeout(function(){
+    vc.classList.remove("lift"); S.pago=true;
+    document.getElementById("pago").innerHTML=selo("PAGO","00H52","azul",-14,"bate");
+    cta.innerHTML='<button class="btn full big lc bate" style="--r:0deg" type="button" data-back>Voltar para a noite</button>';
+    toast("Pago. Você economizou R$ 6,40");
+  }, 1500);
+};
+A.encerrarNoite=function(){
+  openSheet('<div class="sh-t">Encerrar a noite?</div><p class="muted">Os benefícios deste lugar saem da tela. Amanhã a gente pergunta como foi.</p><button class="btn full big mt24" type="button" data-act="dormir">Encerrar e ir dormir</button><button class="btn full ghost mt12" type="button" data-act="closeSheet">Continuar na festa</button>');
+};
+A.dormir=function(){ closeSheet(); S.noite=null; S.posPend=true; S.perguntasPend=true; S.resp={}; setTimeout(lockScreen, 300); };
+function lockScreen(){
+  var L=document.getElementById("lock");
+  L.innerHTML='<div class="wall">'+blobSVG("rosa",4,"position:absolute;left:10%;top:10%;width:70%","")+blobSVG("ciano",2,"position:absolute;left:30%;top:40%;width:80%;mix-blend-mode:multiply","")+blobSVG("lima",3,"position:absolute;left:-10%;top:60%;width:60%;mix-blend-mode:multiply","")+'</div>'+
+    '<div class="ld">sábado, 8 de novembro</div><div class="lt">11:20</div>'+
+    '<button class="notif" type="button" data-act="abrirNotif">'+avatar("ressaca")+'<div style="flex:1"><div class="nh"><span>CARIMBO</span><span>agora</span></div><b>Ressaca? A gente também.</b><p>Conta como foi o Baile Tinta Fresca e ganhe até 15 pontos.</p></div></button>'+
+    '<div class="lhint">Toque na notificação</div>';
+  L.classList.add("open");
+  stack.length=0; show("explorar","none");
+}
+A.abrirNotif=function(){ var L=document.getElementById("lock"); L.classList.remove("open"); go("pos",{anim:"up"}); };
+A.publicarReview=function(){
+  var ta=document.getElementById("revtxt"), txt=(ta&&ta.value.trim())||"Som impecável e fila rápida antes da meia-noite. O desconto no bar fez diferença.";
+  S.minhaReview={ev:"baile", mine:true, data:"08 NOV", txt:txt, aj:0}; S.posPend=false;
+  pontos(10,"Review publicada");
+  stack.length=0; stack.push("explorar");
+  show("evento/baile","fade");
+  setTimeout(function(){ var r=document.getElementById("reviews"), v=viewsEl.querySelector(".view:not(.leaving)"); if(r&&v) v.scrollTo({top:r.offsetTop-80, behavior:"smooth"}); }, 500);
+};
+A.pularReview=function(){ stack.length=0; show("explorar","fade"); };
+A.pag=function(d){
+  var info=nivelInfo(S.carimbos.length), pg=(S.pageView==null?info.pag:S.pageView)+(+d);
+  S.pageView=Math.max(0,Math.min(NIV.length-1,pg)); S.turn=+d>0?"turn-l":"turn-r"; rerender();
+};
+A.arqPag=function(arg){ var p=arg.split("|"); S.arqPage=Math.max(0,Math.min(1,(S.arqPage||0)+(+p[0]))); S.turn=+p[0]>0?"turn-l":"turn-r"; rerender(); };
+A.wrapped=function(){ toast("Wrapped do mês: fica para depois do essencial"); };
+A.bloqueado=function(falta){
+  openSheet('<div class="sh-t">Faltam '+plural(+falta,"carimbo","carimbos")+'</div><p class="muted">Este benefício abre quando você completar a página do passaporte. Cada festa com check-in é um carimbo.</p>'+
+    '<div class="mt16">'+reguaHTML(S.carimbos.length)+'</div><button class="btn full big mt24" type="button" data-act="acharRole">Achar uma festa</button>');
+};
+A.acharRole=function(){ closeSheet(); tab("explorar"); };
+A.resgatar=function(id){
+  var t=TROCA.filter(function(x){return x.id===id;})[0];
+  openSheet('<div class="sh-t">Trocar '+t.pts+' pontos?</div><p class="muted">'+t.titulo+' · '+t.onde+'. Fica na sua carteira até '+t.validade.replace("até ","")+'.</p>'+
+    '<div class="card sunk mt16"><div class="kv dark"><span>Saldo agora</span><span>'+S.pontos+' pontos</span></div><div class="kv dark total"><span>Depois</span><span>'+(S.pontos-t.pts)+' pontos</span></div></div>'+
+    '<button class="btn full big mt24" type="button" data-act="confirmaResgate" data-arg="'+id+'">Confirmar troca</button><button class="btn full ghost mt12" type="button" data-act="closeSheet">Cancelar</button>');
+};
+A.confirmaResgate=function(id){
+  var t=TROCA.filter(function(x){return x.id===id;})[0];
+  closeSheet(); S.resgatados[id]=true; S.carteira.unshift({id:id, tk:t.tk, kind:t.kind, titulo:t.titulo, onde:t.onde, novo:true});
+  pontos(-t.pts,"Resgatado. Já está na sua carteira.");
+  setTimeout(function(){ show(cur,"none"); }, 200);
+};
+A.comoGanhar=function(){
+  openSheet('<div class="sh-t">Como ganhar pontos</div><div class="ganhos" style="grid-template-columns:1fr 1fr"><div><b>+5</b><span>3 perguntas rápidas</span></div><div><b>+10</b><span>escrever review</span></div><div><b>+1</b><span>cada “isso ajudou”</span></div><div><b>+'+BONUS_PAGINA+'</b><span>página completa</span></div></div>'+
+    '<button class="btn full big mt24" type="button" data-act="avaliarUltima">Avaliar a última festa</button>');
+};
+A.avaliarUltima=function(){ closeSheet(); S.perguntasPend=true; go("pos",{anim:"up"}); };
+A.usar=function(id){
+  if(S.noite){ go("cartao"); return; }
+  openSheet('<div class="sh-t">Use na festa</div><p class="muted">Quando você fizer check-in, o benefício aparece na noite ativa e é aplicado no cartão virtual.</p><button class="btn full big mt24" type="button" data-act="closeSheet">Entendi</button>');
+  S.carteira.forEach(function(c){ if(c.id===id) c.novo=false; });
+};
+A.avInk=function(arg){ var p=arg.split("|"); S.avatarInk=p[0]; rerender(); };
+A.avatarPronto=function(origem){ S.avatarAsked=true; if(origem==="ck"){ go("confirmando",{replace:true,anim:"fade"}); } else back(); };
+A.criarLista=function(){
+  var v=document.getElementById("lnome"); S.novaLista=(v&&v.value.trim())||"Pré de sexta";
+  iosAlert("“Carimbo” quer acessar seus contatos","Para achar seus amigos que já estão no Carimbo. Nada é enviado sem você escolher.",[["Permitir","contatosOk",true],["Não permitir","closeSheet"]]);
+};
+A.contatosOk=function(){ closeSheet(); go("contatos"); };
+A.selCt=function(n){ S.sel[n]=!S.sel[n]; rerender(); };
+A.addLista=function(){ var n=Object.keys(S.sel).filter(function(k){return S.sel[k];}).length; S.listas.push({nome:S.novaLista||"Pré de sexta", n:n}); S.sel=null; back(); setTimeout(rerender,470); toast("Lista criada com "+plural(n,"pessoa","pessoas")); };
+A.sw=function(k, el){ if(k==="optin") S.optin=!S.optin; else S.pv[k]=!S.pv[k]; el.setAttribute("aria-checked", String(k==="optin"?S.optin:S.pv[k])); };
+A.roteiro=function(){ openSheet('<div class="rt">'+roteiroHTML()+'</div>'); };
+
+/* =====================================================================
+   ROTEIRO E ESTADOS (painel lateral no computador, sheet no iPhone)
+   ===================================================================== */
+var J = {
+  f0:function(){ novo(); stack.length=0; show("abertura","fade"); },
+  f1:function(){ stack.length=0; show("explorar","fade"); },
+  f1d:function(){ stack.length=0; stack.push("explorar"); show("evento/baile","push"); },
+  f2:function(){ if(S.noite){ S.noite=null; S.checkinHoje=false; if(S.carimbos.length && S.carimbos[S.carimbos.length-1].data==="07 NOV") S.carimbos.pop(); } stack.length=0; show("explorar","none"); A.checkin(); },
+  f3:function(){ if(!S.noite){ S.noite={ev:"baile",desde:"23H40"}; S.checkinHoje=true; } stack.length=0; stack.push("explorar"); show("noite","push"); },
+  f4:function(){ S.noite=null; lockScreen(); },
+  f5:function(){ tab("passaporte"); },
+  f6:function(){ tab("beneficios"); },
+  f7:function(){ tab("voce"); },
+  novo:function(){ novo(); stack.length=0; show("explorar","fade"); toast("Usuário novo: sem conta, sem carimbos"); },
+  rec:function(){ recorrente(); stack.length=0; show("explorar","fade"); toast("Usuário recorrente: 2 carimbos, 85 pontos"); },
+  gps:function(){ S.gpsErro=true; S.noite=null; S.checkinHoje=false; stack.length=0; show("explorar","none"); A.checkin(); },
+  vazio:function(){ S.carimbos=[]; S.pageView=null; tab("passaporte"); },
+  virada:function(){ virada(); },
+  pobre:function(){ S.pontos=20; S.resgatados={}; tab("beneficios"); toast("Saldo: 20 pontos"); },
+  loja:function(){ S.lojaVazia=!S.lojaVazia; tab("beneficios"); },
+  pos:function(){ S.noite=null; S.perguntasPend=true; stack.length=0; show("explorar","none"); go("pos",{anim:"up"}); }
+};
+function virada(){
+  tab("passaporte");
+  setTimeout(function(){
+    var bw=document.getElementById("bookwrap"); if(!bw) return;
+    var s=document.createElement("div"); s.style.cssText="position:absolute;left:50%;top:50%;width:170px;margin:-85px 0 0 -85px;z-index:5";
+    s.innerHTML=selo("ARQUIVADO",S.mes,"verm",-12,"bate"); bw.style.position="relative"; bw.appendChild(s);
+    setTimeout(function(){
+      ARQUIVO.nov={mes:S.mes, carimbos:S.carimbos.slice()}; S.arquivo.unshift("nov");
+      S.mes="DEZ 2026"; S.carimbos=[]; S.pageView=null; S.turn="turn-l"; rerender(); toast("Passaporte de dezembro, novo em folha");
+    }, 1300);
+  }, 450);
+}
+function roteiroHTML(){
+  function b(k,n,t){ return '<button class="rb" type="button" data-jump="'+k+'"><i>'+n+'</i><span>'+t+'</span></button>'; }
+  return '<h2>Carimbo</h2><p>Protótipo clicável do frequentador. Nada funciona de verdade: o estado é falso e zera quando a página recarrega.</p>'+
+    '<h3>Fluxos</h3>'+b("f0","F0","Entrada: abertura e voucher")+b("f1","F1","Descoberta: Explorar")+b("f1d","F1","Detalhe do evento")+b("f2","F2","Check-in e carimbar")+b("f3","F3","Noite ativa e cartão virtual")+
+      b("f4","F4","Pós-evento: notificação")+b("f5","F5","Passaporte")+b("f6","F6","Benefícios")+b("f7","F7","Você e conta")+
+    '<h3>Estados</h3>'+b("novo","·","Usuário novo (sem conta)")+b("rec","·","Usuário recorrente")+b("gps","·","Check-in: fora do raio")+b("vazio","·","Passaporte vazio")+
+      b("virada","·","Virada de mês")+b("pobre","·","Pontos insuficientes")+b("loja","·","Loja vazia (liga/desliga)")+b("pos","·","Perguntas pendentes")+
+    '<p class="foot">Provisórios: avatar, logo, valores de pontos e taxa, níveis 8 e 12, eventos e lugares. No iPhone, este painel abre com 3 toques no topo da tela.</p>';
+}
+document.getElementById("roteiro").innerHTML=roteiroHTML();
+
+/* =====================================================================
+   EVENTOS
+   ===================================================================== */
+document.addEventListener("click", function(e){
+  var j=e.target.closest("[data-jump]");
+  if(j){ closeSheet(); document.getElementById("lock").classList.remove("open"); J[j.dataset.jump](); return; }
+  var t=e.target.closest("[data-go],[data-tab],[data-back],[data-act]");
+  if(!t || t.disabled) return;
+  if(t.dataset.go){ if(sheet.classList.contains("open")) closeSheet(); go(t.dataset.go); }
+  else if(t.dataset.tab){ if(sheet.classList.contains("open")) closeSheet(); tab(t.dataset.tab); }
+  else if(t.hasAttribute("data-back")) back();
+  else if(t.dataset.act && A[t.dataset.act]) A[t.dataset.act](t.dataset.arg, t);
+});
+document.addEventListener("touchstart", function(){}, {passive:true}); /* ativa :active no iOS */
+
+/* 3 toques no topo abrem o roteiro */
+var taps=[];
+document.getElementById("device").addEventListener("pointerdown", function(e){
+  var r=this.getBoundingClientRect();
+  if(e.clientY - r.top > 60) return;
+  var now=Date.now(); taps=taps.filter(function(t){return now-t<700;}); taps.push(now);
+  if(taps.length>=3){ taps=[]; A.roteiro(); }
+});
+
+/* relógio da moldura */
+(function(){ var c=document.getElementById("clock"); if(c) c.textContent="23:40"; })();
+
+/* início */
+var start=(location.hash||"").slice(1);
+if(start && R[parse(start)[0]] && ["confirmando","carimbar","progresso"].indexOf(parse(start)[0])<0){ if(start!=="abertura"&&start!=="voucher") stack.push("explorar"); show(start,"none"); }
+else { novo(); show("abertura","none"); }
+
+})();
+</script>
+</body>
+</html>
