@@ -1,0 +1,1312 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script>document.documentElement.className+=" js"</script>
+<title>Carimbo — Projetar para Concretizar (v4 · objetos)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* =====================================================================
+   TOKENS — sistema Carimbo v1 (tema Papel) + 4 tintas CMYK decididas em 05/11.
+   Bordas ásperas e blobs: filtros #aspero / #aspero-lg / #fibra (ver <svg> no topo do body).
+   ===================================================================== */
+:root{
+  /* superfícies e texto */
+  --surface:#020202;
+  --raised:#241c30;
+  --sunken:#3a2f47;
+  --papel:#f0ece2;
+  --on-papel:#020202;
+  --ink:#fbfbfb;
+  --ink-muted:#b4aeb9;
+  --hairline:#443f38;
+  --border-control:#87877f;
+  --focus:#cbec50;
+  --carimbo-azul:#9db4ff;
+
+  /* tintas (sempre em multiply) */
+  --tinta-rosa:#f06dc3;
+  --tinta-laranja:#f29049;
+  --tinta-lima:#a0d248;
+  --tinta-ciano:#5db3da;
+
+  /* camadas do blueprint */
+  --layer-evid:#87877f;
+  --layer-user:var(--tinta-lima);
+  --layer-front:var(--tinta-ciano);
+  --layer-back:var(--tinta-laranja);
+  --layer-support:var(--tinta-rosa);
+
+  /* tipografia */
+  --font-body:-apple-system,"SF Pro Text",system-ui,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --font-display:-apple-system,"SF Pro Display",system-ui,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --font-xl:"Archivo",var(--font-display);
+  --font-mono:"DM Mono",ui-monospace,Menlo,monospace;
+
+  /* forma */
+  --radius-sm:12px;
+  --radius-lg:24px;
+  --nav-h:56px;
+}
+
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-snap-type:y proximity}
+body{margin:0;background:var(--surface);color:var(--ink);font-family:var(--font-body);font-size:17px;line-height:1.5;-webkit-font-smoothing:antialiased}
+h1,h2,h3{margin:0;line-height:1.1}
+h2,h3{font-family:var(--font-display)}
+p{margin:0}
+button{font:inherit;color:inherit;cursor:pointer}
+:focus-visible{outline:2px solid var(--focus);outline-offset:3px}
+
+/* ---------- botões: uma só chapa; no toque ela gira e encaixa com mola (D8, sem multiply) ---------- */
+.tab,.chip,.seg button,.nav-btn,.step,.fs,.vbtn,.fchip{
+  position:relative;isolation:isolate;border:0;background:none;border-radius:999px;
+  padding:8px 16px;font-size:14px;font-weight:500;color:var(--ink);transition:color .2s
+}
+.tab::before,.chip::before,.seg button::before,.nav-btn::before,.step::before,.fs::before,.vbtn::before,.fchip::before{
+  content:"";position:absolute;inset:0;z-index:-1;border-radius:999px;
+  background:var(--sunken);
+  transform:rotate(0deg);transition:transform 420ms cubic-bezier(.34,1.8,.5,1)
+}
+.tab[aria-selected="true"],.seg button[aria-pressed="true"],.step[aria-current="true"],.fchip[aria-pressed="true"]{color:#020202;font-weight:600}
+.tab[aria-selected="true"]::before,.seg button[aria-pressed="true"]::before,.step[aria-current="true"]::before,.fchip[aria-pressed="true"]::before{
+  background:var(--tinta-rosa);box-shadow:none;filter:url(#aspero);transform:rotate(-1.2deg)
+}
+.tab:hover::before,.chip:hover::before,.seg button:hover::before,.nav-btn:not([disabled]):hover::before,.step:hover::before,.fs:hover::before,.vbtn:hover::before,.fchip:hover::before,
+.tab:focus-visible::before,.chip:focus-visible::before,.seg button:focus-visible::before,.nav-btn:focus-visible::before,.step:focus-visible::before,.fs:focus-visible::before,.vbtn:focus-visible::before,.fchip:focus-visible::before,
+.tab:active::before,.chip:active::before,.seg button:active::before,.nav-btn:not([disabled]):active::before,.step:active::before,.fs:active::before,.vbtn:active::before,.fchip:active::before{
+  transform:rotate(2deg)
+}
+.step[aria-current="true"] em{background:color-mix(in srgb,#fff 45%,transparent)}
+@media (prefers-reduced-motion:reduce){
+  .tab::before,.chip::before,.seg button::before,.nav-btn::before,.step::before,.fs::before,.vbtn::before,.fchip::before{transition:none}
+}
+
+/* navegação */
+.top{position:fixed;inset:0 0 auto 0;height:var(--nav-h);display:flex;align-items:center;gap:6px;padding:0 20px;background:linear-gradient(to bottom,rgba(2,2,2,.92),rgba(2,2,2,.6) 60%,rgba(2,2,2,0));z-index:50}
+.top .brand{font-family:var(--font-xl);font-weight:800;font-size:20px;letter-spacing:-.01em;margin-right:auto}
+.top a{color:var(--ink-muted);text-decoration:none;font-size:14px;padding:6px 10px;border-radius:999px}
+.top a:hover,.top a.on{color:var(--ink);background:var(--sunken)}
+
+/* telas */
+.screen{background:radial-gradient(ellipse 60vw 44vh at var(--gx,85%) 50%,color-mix(in srgb,var(--glow,var(--tinta-rosa)) 26%,transparent),transparent),var(--sec,var(--surface))}
+#inicio{--glow:var(--tinta-rosa);--gx:80%;}
+#pesquisa{--glow:var(--tinta-ciano);--gx:10%;}
+#conceito{--glow:var(--tinta-lima);--gx:95%;}
+#funciona{--glow:var(--tinta-laranja);--gx:5%;}
+#negocio{--glow:var(--tinta-rosa);--gx:100%;}
+#blueprints{--glow:var(--tinta-ciano);--gx:95%;}
+#fluxo{--glow:var(--tinta-laranja);--gx:0%;}
+#proximos{--glow:var(--tinta-lima);--gx:50%;}
+.hero h1{text-shadow:0 0 .35em color-mix(in srgb,var(--tinta-rosa) 55%,transparent)}
+.eyebrow{color:var(--tinta-lima)}
+.hero .lead{color:var(--ink)}
+.screen{position:relative;overflow:hidden;min-height:100vh;padding:calc(var(--nav-h) + 40px) clamp(20px,6vw,96px) 56px;scroll-snap-align:start;display:flex;flex-direction:column;justify-content:center}
+.screen > .in{position:relative;z-index:1;width:100%;max-width:1240px;margin:0 auto}
+.blobs{position:absolute;inset:0;z-index:0;pointer-events:none;isolation:isolate}
+.blobs svg{position:absolute;aspect-ratio:1;mix-blend-mode:multiply;opacity:.55;overflow:visible}
+.eyebrow{font-family:var(--font-mono);font-weight:500;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-muted);margin-bottom:14px}
+h2{font-size:clamp(30px,4.4vw,56px);font-weight:800;letter-spacing:-.02em;margin-bottom:20px;max-width:18ch}
+.lead{font-size:clamp(18px,1.7vw,22px);color:var(--ink-muted);max-width:60ch}
+
+.hero h1{font-family:var(--font-xl);font-weight:800;font-size:clamp(64px,13vw,190px);letter-spacing:-.04em;line-height:.95}
+.hero h1 small{font-family:var(--font-mono);font-size:.1em;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-muted);font-weight:500;margin-left:.9em}
+.hero .lead{margin-top:24px;color:var(--ink)}
+.hero .meta{margin-top:32px;color:var(--ink-muted);font-size:15px}
+
+.grid{display:grid;gap:16px;margin-top:32px}
+.g2{grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
+.g3{grid-template-columns:repeat(auto-fit,minmax(230px,1fr))}
+
+/* cartão com borda áspera (a plaquinha fica no ::before; o texto nunca é filtrado) */
+.card,.detail,.callout{position:relative;isolation:isolate}
+.card::before,.detail::before,.callout::before{
+  content:"";position:absolute;inset:0;z-index:-1;border-radius:var(--radius-lg);
+  background:var(--raised)
+}
+.card{padding:22px}
+.card h3{font-size:19px;font-weight:700;margin-bottom:8px}
+.card p{color:var(--ink-muted);font-size:16px}
+
+/* tag = carimbo de texto */
+.tag{display:inline-block;position:relative;isolation:isolate;font-family:var(--font-mono);font-weight:500;font-size:12px;line-height:1;letter-spacing:.06em;text-transform:uppercase;color:var(--carimbo-azul);padding:6px 10px;margin-bottom:12px;transform:rotate(-2deg)}
+.tag::before{content:"";position:absolute;inset:0;z-index:-1;border-radius:4px;background:color-mix(in srgb,var(--carimbo-azul) 24%,var(--sunken));filter:url(#aspero)}
+.grid > :nth-child(even) .tag{transform:rotate(1.5deg)}
+
+.note{margin-top:20px;font-size:14px;color:var(--ink-muted)}
+.callout{margin-top:28px;padding:20px 26px 20px 30px;max-width:62ch;color:var(--on-papel)}
+.callout::before{background:var(--papel);box-shadow:none;border-radius:var(--radius-sm)}
+
+/* fluxo do conceito: cada passo é uma chapa de tinta */
+.flow{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin-top:28px}
+.flow span{position:relative;isolation:isolate;color:#020202;font-weight:600;padding:10px 18px;font-size:15px}
+.flow span::before{content:"";position:absolute;inset:0;z-index:-1;border-radius:999px;background:var(--tinta-ciano);filter:url(#aspero);transform:rotate(-1.5deg)}
+.flow span:nth-of-type(2)::before{background:var(--tinta-rosa);transform:rotate(1.2deg)}
+.flow span:nth-of-type(3)::before{background:var(--tinta-laranja)}
+.flow span:nth-of-type(4)::before{background:var(--tinta-lima);transform:rotate(1.5deg)}
+.flow i{font-style:normal;color:var(--ink-muted)}
+
+/* =====================  BLUEPRINT  ===================== */
+.bp-head{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:18px}
+.tabs{display:flex;flex-wrap:wrap;gap:10px}
+.seg{margin-left:auto;display:flex;gap:10px}
+
+.persona{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin-bottom:16px}
+.persona .card{padding:16px 20px}
+.persona b{display:block;font-family:var(--font-mono);font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-muted);margin-bottom:4px;font-weight:500}
+.persona span{font-size:16px}
+
+.filters{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:16px}
+.filters .lbl{font-family:var(--font-mono);font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-muted);margin-right:4px}
+.chip{display:inline-flex;align-items:center;padding:6px 14px}
+.chip .dot{width:10px;height:10px;border-radius:50%;background:var(--c);margin-right:8px;flex:none}
+.chip[aria-pressed="false"]{opacity:.45}
+
+.stepper{display:flex;gap:8px;overflow-x:auto;padding:6px 6px 14px;margin-bottom:8px}
+.step{flex:0 0 auto;display:flex;align-items:center;gap:8px;padding:8px 16px 8px 8px;font-size:15px}
+.step em{font-style:normal;width:26px;height:26px;border-radius:50%;display:grid;place-items:center;background:var(--sunken);font-family:var(--font-mono);font-size:12px;font-weight:500}
+
+.detail{padding:clamp(18px,3vw,32px)}
+.detail h3{font-size:clamp(24px,3vw,36px);font-weight:800;margin-bottom:4px}
+.detail .sub{color:var(--ink-muted);font-size:15px;margin-bottom:20px}
+.layer{position:relative;isolation:isolate;padding:14px 20px;margin-bottom:10px}
+.layer::before{content:"";position:absolute;inset:0;z-index:-1;border-radius:var(--radius-sm);background:color-mix(in srgb,var(--c) 24%,var(--raised))}
+.layer b{display:block;font-family:var(--font-mono);font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:color-mix(in srgb,var(--c) 45%,var(--ink));margin-bottom:4px;font-weight:500}
+.layer p{font-size:clamp(17px,1.7vw,21px)}
+.layer.empty p{color:var(--ink-muted);font-size:15px;font-style:italic}
+.pend{display:inline-block;margin-left:8px;font-family:var(--font-mono);font-size:11px;padding:2px 8px;border-radius:999px;background:var(--sunken);color:var(--ink-muted);vertical-align:middle;font-style:normal;text-transform:uppercase}
+.divider{display:flex;align-items:center;gap:12px;margin:14px 0;color:var(--ink-muted);font-family:var(--font-mono);font-size:12px;letter-spacing:.06em;text-transform:uppercase}
+.divider::before,.divider::after{content:"";flex:1;border-top:2px dashed var(--hairline)}
+.pager{display:flex;justify-content:space-between;margin-top:18px}
+.nav-btn[disabled]{opacity:.35;cursor:default}
+
+/* mapa completo: a grade fica reta, só os rótulos ganham tinta */
+.mapwrap{overflow:auto;border-radius:var(--radius-lg);background:var(--surface);max-height:70vh}
+.map{display:grid;min-width:max-content;gap:2px;background:var(--surface)}
+.map .h,.map .rl,.map .c{padding:10px 12px}
+.map .h{position:sticky;top:0;background:var(--raised);z-index:2;font-size:13px;font-weight:600;text-align:left;border-top:0;cursor:pointer}
+.map .h:hover{background:var(--sunken)}
+.map .rl{position:sticky;left:0;z-index:1;background:color-mix(in srgb,var(--c) 30%,var(--raised));font-family:var(--font-mono);font-size:11px;font-weight:500;letter-spacing:.04em;text-transform:uppercase}
+.map .corner{position:sticky;left:0;top:0;z-index:3;background:var(--surface)}
+.map .c{background:color-mix(in srgb,var(--c) 14%,var(--raised));font-size:13px;line-height:1.35;cursor:pointer}
+.map .c:hover{background:color-mix(in srgb,var(--c) 30%,var(--raised))}
+.map .c span{display:-webkit-box;-webkit-line-clamp:5;-webkit-box-orient:vertical;overflow:hidden}
+.map .c.nil{background:var(--raised);color:var(--hairline)}
+.hint{margin-top:10px;font-family:var(--font-mono);font-size:12px;letter-spacing:.04em;color:var(--ink-muted)}
+
+/* =====================  FLUXO DE TELAS (pan + zoom)  ===================== */
+.fchips{display:flex;flex-wrap:wrap;gap:8px;margin:28px 0 14px;padding:0 4px}
+.fchip{display:inline-flex;align-items:center;padding:6px 14px}
+.fchip .dot{width:10px;height:10px;border-radius:50%;background:var(--c);margin-right:8px;flex:none}
+.fchip[aria-pressed="true"] .dot{box-shadow:0 0 0 2px #020202}
+.vw{position:relative;height:clamp(420px,64vh,700px);border-radius:var(--radius-lg);overflow:hidden;background-color:var(--raised);
+  background-image:radial-gradient(color-mix(in srgb,var(--hairline) 40%,transparent) 1.2px,transparent 1.4px);background-size:28px 28px;
+  touch-action:none;cursor:grab;user-select:none;-webkit-user-select:none}
+.vw.drag{cursor:grabbing}
+.vw svg{width:100%;height:100%;display:block}
+.vtools{position:absolute;right:14px;bottom:14px;display:flex;gap:8px}
+.vbtn{min-width:40px;padding:8px 14px;font-size:16px}
+.vbtn.wide{font-size:14px}
+.vhint{position:absolute;left:18px;bottom:16px;font-family:var(--font-mono);font-size:12px;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-muted);pointer-events:none}
+.vw text{font-family:var(--font-body);font-weight:700;font-size:15px;fill:#020202;text-anchor:middle;pointer-events:none}
+.vw .big text{font-size:18px}
+.vw .ghost text{fill:var(--ink);font-weight:600}
+.vw text.el{font-family:var(--font-mono);font-weight:500;font-size:12px;fill:var(--ink-muted);paint-order:stroke;stroke:var(--raised);stroke-width:6px;stroke-linejoin:round}
+.vw text.grp{font-family:var(--font-mono);font-weight:500;font-size:12px;letter-spacing:.08em;fill:var(--ink-muted);text-transform:uppercase}
+
+.foot{padding:32px;text-align:center;color:var(--ink-muted);font-family:var(--font-mono);font-size:12px;letter-spacing:.04em;text-transform:uppercase}
+
+@media (max-width:700px){.top a{display:none}.seg{margin-left:0}.vhint{display:none}}
+/* carimbo de entrada: cada seção chega carimbando (replay a cada visita) */
+@keyframes carimbar{
+  0%{opacity:0;transform:scale(1.4) rotate(calc(var(--r,0deg) - 5deg))}
+  42%{opacity:1;transform:scale(.94) rotate(calc(var(--r,0deg) + 1deg))}
+  68%{transform:scale(1.03) rotate(calc(var(--r,0deg) - .5deg))}
+  100%{opacity:1;transform:scale(1) rotate(var(--r,0deg))}
+}
+@keyframes bater{
+  0%{opacity:0;transform:scale(2) rotate(calc(var(--r,0deg) - 28deg))}
+  55%{opacity:1;transform:scale(.9) rotate(calc(var(--r,0deg) + 3deg))}
+  100%{opacity:1;transform:scale(1) rotate(var(--r,0deg))}
+}
+.js .stampable{opacity:0}
+.js .stampable.stamped{opacity:1;animation:carimbar .62s cubic-bezier(.3,.9,.4,1) backwards;animation-delay:calc(var(--i,0) * 75ms)}
+.js .secstamp.stamped{animation-name:bater;animation-duration:.5s;animation-delay:.2s}
+h1.stampable,h2.stampable{transform-origin:0 60%}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}.js .stampable{opacity:1}.js .stampable.stamped{animation:none}}
+@media print{.top{display:none}.screen{min-height:auto}}
+
+/* =====================  v4 · OBJETOS DA NOITE  ===================== */
+:root{
+  --c-rosa:#f07ac0;--c-azul:#9db4ff;--c-verm:#ff8a80;--c-verde:#9fdc7d;
+  --p-rosa:#d5308e;--p-azul:#080aa0;--p-verm:#a8322b;--p-verde:#2f6a1b
+}
+.hero h1{text-shadow:none}
+
+/* hero = cartaz lambe-lambe: tipografia em sobreposição de tinta, retícula, marcas de registro */
+.hero h1.overprint{position:relative;isolation:isolate;display:inline-block}
+.hero h1.overprint::before,.hero h1.overprint::after{content:attr(data-t);position:absolute;inset:0;z-index:-1;filter:url(#fibra)}
+.hero h1.overprint::before{color:var(--tinta-rosa);transform:translate(-2px,2px)}
+.hero h1.overprint::after{color:var(--tinta-ciano);transform:translate(2px,-2px);mix-blend-mode:multiply}
+.halftone{position:absolute;inset:0;z-index:0;pointer-events:none;
+  background:radial-gradient(var(--tinta-ciano) 2.3px,transparent 2.8px) 0 0/17px 17px;
+  -webkit-mask-image:radial-gradient(circle at 78% 70%,#000 0,transparent 42%);mask-image:radial-gradient(circle at 78% 70%,#000 0,transparent 42%);opacity:.8}
+.hero-stamp{transform:rotate(var(--r,0deg));position:absolute;z-index:2;right:9vw;bottom:15vh;display:flex;flex-direction:column;align-items:center;gap:4px;padding:14px 22px;color:var(--c-rosa);font-family:var(--font-mono);text-transform:uppercase;pointer-events:none}
+.hero-stamp::before{content:"";position:absolute;inset:0;border:3px double currentColor;border-radius:6px;filter:url(#aspero)}
+.hero-stamp b{font-size:clamp(24px,2.8vw,40px);font-weight:500;letter-spacing:.06em}
+.hero-stamp span{font-size:16px;letter-spacing:.08em}
+
+/* carimbo redondo de cada seção */
+.secstamp{position:absolute;top:-36px;right:-14px;width:clamp(150px,12.5vw,190px);height:clamp(150px,12.5vw,190px);pointer-events:none;color:var(--st,var(--c-rosa));z-index:2}
+.secstamp svg{width:100%;height:100%;overflow:visible;filter:url(#aspero)}
+.secstamp circle{fill:none;stroke:currentColor}
+.secstamp text{fill:currentColor;font-family:var(--font-mono);text-anchor:middle;text-transform:uppercase}
+
+/* ingressos coloridos */
+.tickets{display:flex;flex-wrap:wrap;gap:30px 24px;margin-top:38px;align-items:flex-start}
+.ticket{--stub:76px;position:relative;isolation:isolate;display:grid;grid-template-columns:1fr var(--stub);width:clamp(270px,23vw,330px);min-height:196px;color:#020202;
+  transform:rotate(var(--r,0deg));transition:transform 420ms cubic-bezier(.34,1.8,.5,1)}
+.tickets.four{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:28px 30px;max-width:960px}
+.tickets.four .ticket{width:auto}
+.tickets.three .ticket{width:clamp(280px,31%,390px)}
+.ticket:hover{transform:rotate(0deg) translateY(-6px)}
+.ticket::before{content:"";position:absolute;inset:0;z-index:-1;border-radius:12px;background:var(--ink-c);
+  -webkit-mask-image:radial-gradient(circle 11px at calc(100% - var(--stub)) 0,transparent 97%,#000),radial-gradient(circle 11px at calc(100% - var(--stub)) 100%,transparent 97%,#000);
+  -webkit-mask-composite:source-in;mask-image:radial-gradient(circle 11px at calc(100% - var(--stub)) 0,transparent 97%,#000),radial-gradient(circle 11px at calc(100% - var(--stub)) 100%,transparent 97%,#000);mask-composite:intersect;
+  filter:url(#aspero-lg)}
+.ticket::after{content:"";position:absolute;inset:0;z-index:-1;border-radius:12px;pointer-events:none;
+  background:radial-gradient(rgba(2,2,2,.2) 1.3px,transparent 1.7px) 0 0/8px 8px;
+  -webkit-mask-image:linear-gradient(135deg,#000,transparent 50%);mask-image:linear-gradient(135deg,#000,transparent 50%)}
+.t-ciano{--ink-c:var(--tinta-ciano)}.t-rosa{--ink-c:var(--tinta-rosa)}.t-lima{--ink-c:var(--tinta-lima)}.t-laranja{--ink-c:var(--tinta-laranja)}
+.tk-main{padding:18px 20px 20px}
+.tk-top{display:flex;justify-content:space-between;gap:10px;font-family:var(--font-mono);font-size:11.5px;letter-spacing:.07em;text-transform:uppercase;margin-bottom:12px}
+.tk-no{opacity:.75}
+.ticket h3{font-family:var(--font-xl);font-weight:800;font-size:clamp(21px,1.9vw,26px);letter-spacing:-.02em;line-height:1.05;margin-bottom:10px}
+.ticket p{font-size:15px;line-height:1.4;color:#020202}
+.tk-big{font-family:var(--font-mono);font-weight:500;font-size:20px;margin:-2px 0 10px;letter-spacing:.02em}
+.tk-stub{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;border-left:2px dashed rgba(2,2,2,.5);margin:14px 0}
+.tk-bar{display:block;width:34px;height:96px;background:repeating-linear-gradient(0deg,#020202 0 2px,transparent 2px 4px,#020202 4px 5px,transparent 5px 8px,#020202 8px 11px,transparent 11px 13px,#020202 13px 14px,transparent 14px 17px)}
+.tk-bar.b2{background:repeating-linear-gradient(0deg,#020202 0 3px,transparent 3px 5px,#020202 5px 6px,transparent 6px 9px,#020202 9px 10px,transparent 10px 14px,#020202 14px 16px,transparent 16px 18px)}
+.tk-code{font-family:var(--font-mono);font-size:11px;letter-spacing:.08em;writing-mode:vertical-rl;transform:rotate(180deg);opacity:.8}
+
+/* passaporte em papel */
+.passport{position:relative;display:grid;grid-template-columns:1fr 1fr;margin-top:36px;max-width:1120px;border-radius:16px;overflow:hidden;color:var(--on-papel);
+  background:var(--papel);transform:rotate(-.5deg)}
+.passport::before{content:"";position:absolute;inset:0;pointer-events:none;
+  background:repeating-radial-gradient(circle at 50% 135%,transparent 0 9px,rgba(8,10,160,.07) 9px 10px),linear-gradient(90deg,transparent 47.5%,rgba(2,2,2,.2) 50%,transparent 52.5%)}
+.pp-page{position:relative;display:flex;flex-direction:column;gap:18px;padding:26px 30px 22px}
+.pp-head{display:flex;justify-content:space-between;font-family:var(--font-mono);font-size:11.5px;letter-spacing:.1em;color:#695f5a;border-bottom:1.5px solid rgba(2,2,2,.2);padding-bottom:10px}
+.pp-entry{position:relative;isolation:isolate;padding:14px 18px 16px;transform:rotate(var(--r,0deg));transition:transform 420ms cubic-bezier(.34,1.8,.5,1)}
+.pp-entry:hover{transform:rotate(0deg) scale(1.02)}
+.pp-entry::before{content:"";position:absolute;inset:0;z-index:-1;border:2.5px solid var(--st);border-radius:8px;filter:url(#aspero-lg);opacity:.9}
+.pp-entry::after{content:"";position:absolute;inset:0;z-index:-1;border:1.5px solid var(--st);border-radius:8px;transform:translate(4px,3px);opacity:.38;filter:url(#aspero-lg)}
+.pp-meta{display:flex;justify-content:space-between;font-family:var(--font-mono);font-size:11px;letter-spacing:.08em;color:var(--st);margin-bottom:6px}
+.pp-entry h3{font-family:var(--font-xl);font-weight:800;font-size:21px;letter-spacing:-.01em;color:var(--st);margin-bottom:6px}
+.pp-entry p{font-size:15px;line-height:1.4;color:#020202}
+.pp-mrz{grid-column:1/-1;position:relative;font-family:var(--font-mono);font-size:12px;letter-spacing:.16em;line-height:1.5;color:rgba(2,2,2,.6);padding:12px 30px 16px;background:rgba(2,2,2,.05);overflow:hidden;white-space:nowrap}
+#blueprints .bp-head{padding-right:clamp(150px,13vw,190px)}
+@media (max-width:980px){.passport{grid-template-columns:1fr}.hero-stamp{display:none}}
+</style>
+</head>
+<body>
+
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <!-- borda áspera de botões e etiquetas (experimento xa) -->
+    <filter id="aspero" x="-15%" y="-60%" width="130%" height="220%">
+      <feTurbulence type="fractalNoise" baseFrequency=".06" numOctaves="3" seed="3" result="r"/>
+      <feDisplacementMap in="SourceGraphic" in2="r" scale="5" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+    <!-- borda áspera de cartões e painéis grandes -->
+    <filter id="aspero-lg" x="-4%" y="-4%" width="108%" height="108%">
+      <feTurbulence type="fractalNoise" baseFrequency=".035" numOctaves="3" seed="9" result="r"/>
+      <feDisplacementMap in="SourceGraphic" in2="r" scale="8" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+    <!-- fibra de tinta nos blobs (experimento xb) -->
+    <filter id="fibra" x="-10%" y="-10%" width="120%" height="120%">
+      <feTurbulence type="fractalNoise" baseFrequency=".8" numOctaves="2" seed="11" result="f"/>
+      <feDisplacementMap in="SourceGraphic" in2="f" scale="3.5" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+  </defs>
+</svg>
+
+
+<header class="top">
+  <span class="brand">Carimbo</span>
+  <a href="#inicio">Início</a>
+  <a href="#pesquisa">Pesquisa</a>
+  <a href="#conceito">Conceito</a>
+  <a href="#funciona">Como funciona</a>
+  <a href="#negocio">Negócio</a>
+  <a href="#blueprints">Blueprints</a>
+  <a href="#fluxo">Fluxo de telas</a>
+  <a href="#proximos">Próximos passos</a>
+  <button class="fs" id="fs" type="button" title="Atalho: F">Tela cheia</button>
+</header>
+
+<main>
+
+<!-- 1. INÍCIO -->
+<section class="screen hero" id="inicio">
+  <div class="halftone" aria-hidden="true"></div>
+  <div class="hero-stamp stampable secstamp-hero" style="--r:8deg" aria-hidden="true"><b>ENTRADA 23H40</b><span>07 NOV 2026</span></div>
+<div class="in">
+  <div class="eyebrow">Projeto para Concretizar · PUC-Rio</div>
+  <h1 class="overprint" data-t="Carimbo">Carimbo</h1>
+  <p class="lead">Um serviço que conecta frequentadores, estabelecimentos e fornecedores por meio de benefícios e informações sobre eventos na noite do Rio de Janeiro.</p>
+  <p class="meta">Role a página ou use o menu para explorar.</p>
+</div></section>
+
+<!-- 2. PESQUISA -->
+<section class="screen" id="pesquisa"><div class="in">
+  <h2>Uma pesquisa própria sobre as dores da noite carioca</h2>
+  <div class="tickets four">
+    <article class="ticket t-ciano" style="--r:-1.6deg"><div class="tk-main"><div class="tk-top"><span class="tk-kind">Quantitativa</span><span class="tk-no">Nº 01</span></div><h3>Formulário</h3><p>Respostas de frequentadores sobre como descobrem e escolhem eventos.</p></div><div class="tk-stub"><span class="tk-bar "></span><span class="tk-code">PQ·01</span></div></article>
+    <article class="ticket t-rosa" style="--r:1.4deg"><div class="tk-main"><div class="tk-top"><span class="tk-kind">Entrevista</span><span class="tk-no">Nº 02</span></div><h3>Entrevistas com organizadores</h3><p>Conversa com gerentes, curadores e promoters que entendem da noite carioca.</p></div><div class="tk-stub"><span class="tk-bar b2"></span><span class="tk-code">PQ·02</span></div></article>
+    <article class="ticket t-lima" style="--r:-0.8deg"><div class="tk-main"><div class="tk-top"><span class="tk-kind">Campo</span><span class="tk-no">Nº 03</span></div><h3>Inquirições contextuais</h3><p>Observação presencial de como o público vive e consome uma noite.</p></div><div class="tk-stub"><span class="tk-bar "></span><span class="tk-code">PQ·03</span></div></article>
+    <article class="ticket t-laranja" style="--r:1.8deg"><div class="tk-main"><div class="tk-top"><span class="tk-kind">Dados</span><span class="tk-no">Nº 04</span></div><h3>Pesquisa de algoritmo</h3><p>Análise do que as plataformas recomendam, comparando regiões e tipos de evento.</p></div><div class="tk-stub"><span class="tk-bar b2"></span><span class="tk-code">PQ·04</span></div></article>
+  </div>
+</div></section>
+
+<!-- 3. CONCEITO -->
+<section class="screen" id="conceito"><div class="in">
+  <h2>Ir a eventos e avaliá-los vira desconto em outros eventos</h2>
+  <p class="lead">Em vez de resolver todos os problemas de uma vez, o grupo escolheu um conceito só: um app gamificado de descoberta de eventos.</p>
+  <div class="flow">
+    <span>Descobre</span><i>→</i><span>Vai ao evento</span><i>→</i><span>Avalia</span><i>→</i><span>Ganha pontos</span><i>→</i><span>Troca por benefícios</span>
+  </div>
+  <div class="tickets three">
+    <article class="ticket t-lima" style="--r:-1.4deg"><div class="tk-main"><div class="tk-top"><span class="tk-kind">Quem frequenta</span><span class="tk-no">ADMIT 1</span></div><h3>Frequentadores</h3><p>Descobrem eventos, economizam e acumulam pontos.</p></div><div class="tk-stub"><span class="tk-bar "></span><span class="tk-code">FQ·01</span></div></article>
+    <article class="ticket t-ciano" style="--r:1.2deg"><div class="tk-main"><div class="tk-top"><span class="tk-kind">Quem organiza</span><span class="tk-no">ADMIT 2</span></div><h3>Estabelecimentos e gerentes</h3><p>Atraem público, escolhem os próprios benefícios e acompanham resultados.</p></div><div class="tk-stub"><span class="tk-bar b2"></span><span class="tk-code">FQ·02</span></div></article>
+    <article class="ticket t-laranja" style="--r:-1deg"><div class="tk-main"><div class="tk-top"><span class="tk-kind">Quem fornece</span><span class="tk-no">ADMIT 3</span></div><h3>Fornecedores</h3><p>Marcas de bebida e transporte entram na experiência da noite.</p></div><div class="tk-stub"><span class="tk-bar "></span><span class="tk-code">FQ·03</span></div></article>
+  </div>
+</div></section>
+
+<!-- 4. COMO FUNCIONA -->
+<section class="screen" id="funciona"><div class="in">
+  <h2>O que o Carimbo faz, em seis peças</h2>
+  <div class="passport">
+    <div class="pp-page pp-l">
+      <div class="pp-head"><span>PASSAPORTE</span><span>RIO DE JANEIRO</span></div>
+      <div class="pp-entry" style="--st:var(--p-rosa);--r:-1.2deg"><div class="pp-meta"><span>PEÇA 1/6</span><span>CARIMBADO</span></div><h3>Check-in no local</h3><p>Você faz check-in no local e, ao sair, responde três perguntas rápidas sobre lotação, gasto e horário. As respostas melhoram a informação sobre o lugar e as recomendações.</p></div>
+      <div class="pp-entry" style="--st:var(--p-azul);--r:0.9deg"><div class="pp-meta"><span>PEÇA 2/6</span><span>CARIMBADO</span></div><h3>Benefícios por critérios</h3><p>Cada estabelecimento decide as condições em que oferece benefícios, por exemplo: ir 3 vezes, convidar um amigo ou consumir R$ 50.</p></div>
+      <div class="pp-entry" style="--st:var(--p-verde);--r:-0.7deg"><div class="pp-meta"><span>PEÇA 3/6</span><span>CARIMBADO</span></div><h3>Reviews e pontos</h3><p>Avaliações longas rendem pontos trocáveis. Quanto mais a review ajuda outras pessoas, medido em likes, mais ela vale.</p></div>
+    </div>
+    <div class="pp-page pp-r">
+      <div class="pp-head"><span>VISTOS</span><span>Nº 005521</span></div>
+      <div class="pp-entry" style="--st:var(--p-verm);--r:1deg"><div class="pp-meta"><span>PEÇA 4/6</span><span>CARIMBADO</span></div><h3>Descoberta e curadoria</h3><p>Curadoria inicial feita pelo próprio time. Seção “Explorar” para sair do hábito e “Clássicos” para o que já marcou seus passaportes.</p></div>
+      <div class="pp-entry" style="--st:var(--p-rosa);--r:-0.8deg"><div class="pp-meta"><span>PEÇA 5/6</span><span>CARIMBADO</span></div><h3>Gamificação</h3><p>Um avatar acompanha o usuário, com tom fofo e bem-humorado (por exemplo, o avatar com ressaca pós-festa).</p></div>
+      <div class="pp-entry" style="--st:var(--p-azul);--r:1.2deg"><div class="pp-meta"><span>PEÇA 6/6</span><span>CARIMBADO</span></div><h3>Privacidade</h3><p>Mostrar publicamente que você vai num evento é opt-in: só aparece se você aceitar. O app tem termos de uso próprios.</p></div>
+    </div>
+    <div class="pp-mrz" aria-hidden="true">P&lt;BRA&lt;CARIMBO&lt;&lt;NOITE&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;<br>0007312&lt;BRA&lt;2611071&lt;M&lt;3011070&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;04</div>
+  </div>
+</div></section>
+
+<!-- 5. NEGÓCIO -->
+<section class="screen" id="negocio"><div class="in">
+  <h2>Quem paga, e pelo quê</h2>
+  <div class="tickets four">
+    <article class="ticket t-rosa" style="--r:-1.3deg"><div class="tk-main"><div class="tk-top"><span class="tk-kind">Receita</span><span class="tk-no">Nº 01</span></div><h3>Cliente: taxa no benefício</h3><div class="tk-big">10% − 2% = 8%</div><p>A taxa é bem menor que o desconto concedido. Exemplo ilustrativo: 10% de desconto − 2% de taxa = 8% líquido para o usuário.</p></div><div class="tk-stub"><span class="tk-bar "></span><span class="tk-code">NG·01</span></div></article>
+    <article class="ticket t-laranja" style="--r:1.1deg"><div class="tk-main"><div class="tk-top"><span class="tk-kind">Receita</span><span class="tk-no">Nº 02</span></div><h3>Festas e eventos: Destaque e descontos internos</h3><p>Eventos que querem atrair novos públicos podem aparecer em destaque, sempre com rótulo publicitário.</p></div><div class="tk-stub"><span class="tk-bar b2"></span><span class="tk-code">NG·02</span></div></article>
+    <article class="ticket t-lima" style="--r:1.5deg"><div class="tk-main"><div class="tk-top"><span class="tk-kind">Fornecedor</span><span class="tk-no">Nº 03</span></div><h3>Marca de bebida: ofertas imperdíveis</h3><p>A marca ganha preferência durante o evento frente às concorrentes por meio de promoções.</p></div><div class="tk-stub"><span class="tk-bar b2"></span><span class="tk-code">NG·03</span></div></article>
+    <article class="ticket t-ciano" style="--r:-0.9deg"><div class="tk-main"><div class="tk-top"><span class="tk-kind">Fornecedor</span><span class="tk-no">Nº 04</span></div><h3>Empresa de transporte: Volta tranquila</h3><p>O parceiro de transporte recebe dados do movimento na região e consegue corridas com facilidade na saída dos eventos.</p></div><div class="tk-stub"><span class="tk-bar "></span><span class="tk-code">NG·04</span></div></article>
+  </div>
+  <p class="note">Possibilidade futura: um dashboard pago para estabelecimentos. Valores de pontos e descontos serão definidos com apoio de um setor financeiro.</p>
+</div></section>
+
+<!-- 6. BLUEPRINTS -->
+<section class="screen" id="blueprints"><div class="in">
+  <h2>O serviço visto por cada público</h2>
+  <div class="bp-head">
+    <div class="tabs" id="tabs" role="tablist"></div>
+    <div class="seg" id="seg">
+      <button type="button" data-v="jornada" aria-pressed="true">Uma etapa por vez</button>
+      <button type="button" data-v="mapa" aria-pressed="false">Todas as etapas</button>
+    </div>
+  </div>
+  <div class="persona" id="persona"></div>
+  <div class="filters" id="filters"></div>
+  <div id="view"></div>
+  <p class="hint">Use as setas ← → do teclado para trocar de etapa. Em “Todas as etapas”, clique em uma célula para abri-la.</p>
+</div></section>
+
+<!-- 7. FLUXO DE TELAS -->
+<section class="screen" id="fluxo"><div class="in">
+  <div class="eyebrow">Fluxo de telas · frequentador</div>
+  <h2>Do “cheguei” ao carimbo</h2>
+  <p class="lead">O app do frequentador tem cinco abas, com o check-in no centro: é o gesto principal, feito em pé, com uma mão, na festa, e gera carimbo, dado e benefício.</p>
+  <div class="fchips" id="fchips" role="group" aria-label="Focar em um fluxo"></div>
+  <div class="vw" id="vw" tabindex="0" role="application" aria-label="Mapa de telas do frequentador. Arraste para mover, use Ctrl ou ⌘ com a roda para dar zoom; teclas + − 0 e setas também funcionam.">
+    <div class="vhint">arraste para mover · ⌘/Ctrl + roda para zoom</div>
+    <div class="vtools">
+      <button class="vbtn" type="button" id="zout" aria-label="Diminuir zoom">−</button>
+      <button class="vbtn" type="button" id="zin" aria-label="Aumentar zoom">+</button>
+      <button class="vbtn wide" type="button" id="zfit">Ver tudo</button>
+    </div>
+  </div>
+</div></section>
+
+<!-- 8. PRÓXIMOS PASSOS -->
+<section class="screen" id="proximos"><div class="in">
+  <h2>O que vem a seguir</h2>
+  <div class="tickets four">
+    <article class="ticket t-ciano" style="--r:-1.5deg"><div class="tk-main"><div class="tk-top"><span class="tk-kind">Em construção</span><span class="tk-no">Nº 01</span></div><h3>Protótipo do app</h3><p>Versão clicável para testar o fluxo do frequentador.</p></div><div class="tk-stub"><span class="tk-bar "></span><span class="tk-code">PX·01</span></div></article>
+    <article class="ticket t-lima" style="--r:1.2deg"><div class="tk-main"><div class="tk-top"><span class="tk-kind">Em construção</span><span class="tk-no">Nº 02</span></div><h3>Identidade visual</h3><p>Design system Carimbo, combinando o digital nítido com o lado orgânico e bagunçado de uma festa.</p></div><div class="tk-stub"><span class="tk-bar b2"></span><span class="tk-code">PX·02</span></div></article>
+    <article class="ticket t-laranja" style="--r:-0.8deg"><div class="tk-main"><div class="tk-top"><span class="tk-kind">Em aberto</span><span class="tk-no">Nº 03</span></div><h3>Funções em avaliação</h3><p>Ver quem vai a um evento e dar like, e o “match” de lugares. Também falta definir o público inicial.</p></div><div class="tk-stub"><span class="tk-bar "></span><span class="tk-code">PX·03</span></div></article>
+    <article class="ticket t-rosa" style="--r:1.6deg"><div class="tk-main"><div class="tk-top"><span class="tk-kind">Aquisição</span><span class="tk-no">Nº 04</span></div><h3>Primeiros usuários</h3><p>Começar por festas do Rio com público fiel, com o primeiro contato no próprio evento e nas redes sociais.</p></div><div class="tk-stub"><span class="tk-bar b2"></span><span class="tk-code">PX·04</span></div></article>
+  </div>
+</div></section>
+
+</main>
+<footer class="foot">Carimbo · Projetar para Concretizar · PUC-Rio</footer>
+
+<script>
+(function(){
+"use strict";
+
+/* ---------- DADOS DOS BLUEPRINTS (fonte: board "Projeto para Concretizar") ---------- */
+var P = function(t){ return {t:t, pending:true}; };
+
+var LAYERS = [
+  {id:"evid",    label:"Evidências físicas",        color:"--layer-evid"},
+  {id:"user",    label:"Ações do usuário",          color:"--layer-user"},
+  {id:"front",   label:"Ações de linha de frente",  color:"--layer-front"},
+  {id:"back",    label:"Ações de bastidores",       color:"--layer-back"},
+  {id:"support", label:"Processo de suporte",       color:"--layer-support"}
+];
+
+var BPS = [
+{
+  id:"freq", tab:"Frequentador", userLabel:"Ações do frequentador",
+  persona:"Frequentador de eventos e consumidor de conteúdo voltado a festas nas redes sociais",
+  scenario:"Um cliente se cadastra no aplicativo, com ou sem o código de um influencer, frequenta um evento e economiza com benefícios",
+  steps:[
+   {label:"Cadastro", evid:"Redes sociais",
+    user:"Se cadastra no aplicativo com ou sem o código de um influencer",
+    front:"Aplicativo faz perguntas para definir o perfil do usuário",
+    back:"IA analisa as perguntas, define o perfil do usuário e recomenda eventos",
+    support:"Sistema armazena dados"},
+   {label:"Escolha da festa", evid:"Aplicativo",
+    user:"Lê avaliações de festas e escolhe uma que participa do programa de benefícios que lhe interessa",
+    front:"Recomenda eventos com base na curadoria + preferências do usuário e mostra informações (preço, faixa etária, música, horário de pico)",
+    back:"Coleta dados de interação para o algoritmo individual e estatísticas",
+    support:"Sistema armazena dados"},
+   {label:"Ingresso", evid:"Aplicativo",
+    user:"Compra o ingresso com uso do código do influencer",
+    front:null,
+    back:"Influencer recebe comissão por compra com seu cupom, sem alterar o valor pago pelo cliente",
+    support:"Direciona o usuário à ticketeira oficial"},
+   {label:"Check-in", evid:"App, localização",
+    user:"Faz check-in no evento",
+    front:"App reconhece a localização via GPS e valida a chegada",
+    back:"Localização e horário de chegada é registrado e enviado",
+    support:"GPS"},
+   {label:"Consumo", evid:"Bar, notificação do banco",
+    user:"Compra bebida de marca parceira com desconto pelo cartão virtual",
+    front:"Atendente do evento faz a cobrança normalmente",
+    back:"Pagamento é descontado, somado a uma taxa (1–5%) e cobrado no cartão do usuário",
+    support:"Desconto em bebida é coberto pela marca parceira"},
+   {label:"Volta para casa", evid:"99",
+    user:"Volta para casa, motorista parceiro chega rapidamente",
+    front:"Aplicativo informa o usuário que há motoristas parceiros pela região",
+    back:"Sistema avisa empresa de transporte sobre movimento na área",
+    support:"Sistema calcula o horário de pico baseado no movimento da noite e de edições anteriores"},
+   {label:"Avaliação", evid:"Aplicativo",
+    user:"Usuário avalia a experiência em troca de pontos",
+    front:"App faz perguntas rápidas e oferece opção de avaliação longa com critérios base, em troca de pontos",
+    back:"IA analisa respostas, atualiza a página do evento e devolve pontos",
+    support:"Dados registrados"},
+   {label:"Recompensa", evid:"Aplicativo",
+    user:"Usuário frequenta mais eventos e, com pontos, desbloqueia benefícios",
+    front:"Gamificação da experiência",
+    back:"Coleta dados de interação para o algoritmo individual e estatísticas",
+    support:null}
+  ]
+},
+{
+  id:"infl", tab:"Influencer", userLabel:"Ações do influencer",
+  persona:"Influencer/Promoter conhecido e confiável de redes sociais",
+  scenario:"Registra o evento no programa de benefícios",
+  steps:[
+   {label:"Convite", evid:"Email ou redes sociais",
+    user:"Aceita convite para participar do serviço",
+    front:"Convite para parceria",
+    back:"Curadoria de influencers do serviço Carimbo",
+    support:"Detecta novo usuário"},
+   {label:"Cadastro", evid:"Aplicativo",
+    user:"Se cadastra no app como influencer",
+    front:"Link de cadastro invisível para influencers",
+    back:null,
+    support:"Sistema de armazenamento de dados"},
+   {label:"Validação", evid:"Aplicativo",
+    user:"Validação da conta de influencer",
+    front:"Aplicativo evidencia e dá o título de promoter ou curador dentro da interface",
+    back:"Aprova influencer no sistema",
+    support:"Sistema de armazenamento de dados"},
+   {label:"Match", evid:"Aplicativo",
+    user:"Match em um gerente de festas/eventos/bar",
+    front:"Algoritmo conecta influencers a gerentes",
+    back:"Sistema analisa perfil de conteúdos criados em outras plataformas",
+    support:"Sistema de armazenamento de dados"},
+   {label:"Combinado", evid:"Aplicativo",
+    user:"Combinam os termos da publi",
+    front:"Chat embutido no app para introdução e botão de direcionamento ao email",
+    back:null,
+    support:"Hosting de mensagens"},
+   {label:"Ida à festa", evid:"Festa",
+    user:"Ida a festas/eventos", front:null, back:null, support:null},
+   {label:"Check-in", evid:"Aplicativo",
+    user:"Check-in por GPS",
+    front:"Feedback de validação do check-in",
+    back:"Horário de chegada é detectado e enviado para a autenticação",
+    support:"Autentica localização por GPS"},
+   {label:"Conteúdo", evid:"Rede social",
+    user:"Criação de conteúdo nas redes sobre o evento e a experiência do Carimbo",
+    front:"Página de review para influencers, com avaliação mais criteriosa, badge no nome e rótulo de parceria em publis",
+    back:null, support:null},
+   {label:"Review", evid:"Aplicativo",
+    user:"Review do evento dentro do app",
+    front:"Usuários e outros influencers do check-in avaliam a review",
+    back:null,
+    support:"Analisa performance do conteúdo gerado"},
+   {label:"Ganhos", evid:null,
+    user:"Recebe comissão por cupom, publi sobre o Carimbo (paga pelo Carimbo) e publi sobre eventos (paga pelo evento)",
+    front:"Comissão e pagamento de publis",
+    back:null,
+    support:"Comunicação externa"},
+   {label:"Novo ciclo", evid:"Aplicativo",
+    user:"Criação de mais conteúdo", front:null, back:null, support:null}
+  ]
+},
+{
+  id:"ger", tab:"Gerente de evento", userLabel:"Ações do gerente",
+  persona:"Gerente/dono de festa/evento noturno no Rio de Janeiro",
+  scenario:"Cadastra o evento no sistema e no programa de benefícios",
+  steps:[
+   {label:"Convite", evid:"Email",
+    user:"Aceita convite para participar do serviço",
+    front:"Convida para parceria", back:null, support:null},
+   {label:"Cadastro", evid:"Aplicativo",
+    user:"Cadastro no sistema",
+    front:null,
+    back:"Verificação de CNPJ",
+    support:"Base de dados do governo de CNPJs"},
+   {label:"Metas", evid:"Aplicativo",
+    user:"Responde perguntas sobre as próprias metas de crescimento",
+    front:"Mostra questionário",
+    back:"Analisa o perfil do usuário baseado nas respostas e gera opções",
+    support:"Armazenamento guarda preferências"},
+   {label:"Benefícios", evid:"Aplicativo",
+    user:"Adere a descontos pré-definidos de marcas de bebida e cria descontos próprios, como no ingresso, conforme suas metas",
+    front:"Sugere opções", back:null, support:null},
+   {label:"Transporte", evid:"Aplicativo",
+    user:"Decide fazer parte do programa de transporte com parceiro (99)",
+    front:"Pergunta sobre horários e termos de uso",
+    back:"Envia dados para empresa de transporte parceira",
+    support:"Banco de dados de empresa de transporte parceira"},
+   {label:"Influencer", evid:"Aplicativo",
+    user:"Dá match num influencer e combinam os termos da publi",
+    front:"Chat embutido no app para introdução e botão de direcionamento ao email",
+    back:"Cruzamento de dados de preferências de usuário",
+    support:"Servidor"},
+   {label:"Destaque", evid:"Aplicativo",
+    user:"Compra propaganda na página inicial",
+    front:"Mostra evento em destaque na página inicial (com rótulo publicitário)",
+    back:null,
+    support:"Processo de pagamento"},
+   {label:"Evento", evid:"Evento",
+    user:"Faz o evento e recebe o influencer",
+    front:P("O que o app mostra ao gerente durante o evento"),
+    back:"Notifica empresa parceira de transporte sobre oportunidades de clientes saindo do local",
+    support:"Empresa parceira"},
+   {label:"Resultados", evid:"Aplicativo",
+    user:"Observa os resultados, escolhe quais benefícios e promoções manter",
+    front:"Algoritmo sugere mais promoções pré-definidas dependendo da satisfação",
+    back:null, support:null}
+  ]
+},
+{
+  id:"lista", tab:"Lista de ingressos", userLabel:"Ações dos usuários",
+  persona:"Frequentadores que formam grupos e o gerente que define as regras da lista",
+  scenario:"Proposta: o grupo só garante o desconto se atingir um mínimo de pessoas dentro de um prazo",
+  steps:[
+   {label:"Regras", evid:null,
+    user:"Gerente define as regras: desconto, tamanho mínimo, limite de listas e prazo",
+    front:"Painel de regras da lista",
+    back:"Regras são publicadas na página do evento",
+    support:"Armazenamento das regras"},
+   {label:"Pedido", evid:null,
+    user:"Frequentador monta a lista com amigos e envia o pedido ao evento",
+    front:"App mostra as regras e convida os amigos",
+    back:"Sistema compara o pedido com as regras",
+    support:"Armazenamento dos pedidos"},
+   {label:"Análise", evid:null,
+    user:"Gerente analisa apenas os pedidos fora das regras",
+    front:"Pedido dentro das regras é aprovado automaticamente",
+    back:"Sistema encaminha exceções ao gerente",
+    support:"Notificações"},
+   {label:"Confirmação", evid:null,
+    user:"Amigos confirmam participação até o prazo",
+    front:"App mostra quantos faltam para o mínimo e o prazo",
+    back:"Sistema verifica se o mínimo foi atingido",
+    support:"Notificações"},
+   {label:"Compra", evid:null,
+    user:"Cada amigo compra o ingresso com seu link",
+    front:"App libera um link individual com desconto",
+    back:"Sistema registra as compras da lista",
+    support:P("Ticketeira aplica o código e informa as vendas")},
+   {label:"Check-in", evid:null,
+    user:"Grupo faz check-in por GPS no evento",
+    front:"App confirma o check-in e mostra quem do grupo chegou",
+    back:"Sistema cruza compra e check-in",
+    support:"Dados alimentam resultados para o gerente"}
+  ]
+},
+{
+  id:"pass", tab:"Passaporte", userLabel:"Ações do frequentador",
+  persona:"Frequentador que acumula carimbos nas festas e troca os pontos por benefícios",
+  scenario:"Do check-in ao desconto usado no bar: cada ida à festa vira carimbo, os carimbos viram pontos e os pontos viram benefícios universais (bebida, comida), sem vínculo a um CNPJ. Só os benefícios vindos de avaliações são vinculados a um estabelecimento",
+  steps:[
+   {label:"Cheguei", evid:null,
+    user:"Abre a aba de check-in “Cheguei” dentro do aplicativo",
+    front:"App pede permissão para usar a localização do usuário",
+    back:"Sistema operacional concede acesso à localização do dispositivo",
+    support:"Sistema operacional iOS e Android"},
+   {label:"Check-in", evid:null,
+    user:"Faz check-in no evento",
+    front:"App reconhece a localização via GPS e valida a chegada",
+    back:"Localização e horário de chegada são registrados e enviados",
+    support:"GPS"},
+   {label:"Carimbar", evid:null,
+    user:"Escolhe o local onde deseja carimbar o carimbo da festa ou evento",
+    front:"App abre a aba do passaporte",
+    back:null,
+    support:"Armazenamento dos dados de ida a festas e eventos"},
+   {label:"Acúmulo", evid:null,
+    user:"Acumula os carimbos da página necessários para resgatar um benefício",
+    front:"App avisa que o usuário já pode resgatar os pontos conquistados",
+    back:null,
+    support:"Notificação"},
+   {label:"Resgate", evid:null,
+    user:"Resgata os pontos",
+    front:"App mostra ao usuário os pontos prometidos",
+    back:"Sistema do aplicativo concede X pontos ao usuário",
+    support:null},
+   {label:"Loja de pontos", evid:null,
+    user:"Abre a página da loja de pontos",
+    front:"App sugere benefícios em troca dos pontos obtidos",
+    back:"Algoritmo analisa os benefícios com base na preferência do usuário",
+    support:"Algoritmo Carimbo"},
+   {label:"Escolha", evid:null,
+    user:"Escolhe o benefício “Duas cervejas pelo preço de uma”",
+    front:null,
+    back:"Sistema do aplicativo adiciona o desconto no Cartão Carimbo",
+    support:P("Sistema bancário Carimbo")},
+   {label:"Uso", evid:null,
+    user:"Quer usar o benefício “duas cervejas pelo preço de uma”",
+    front:"App encaminha para a aba do Cartão Carimbo",
+    back:null,
+    support:P("Sistema bancário Carimbo")},
+   {label:"Compra", evid:null,
+    user:"Compra duas cervejas pelo preço de uma",
+    front:"App mostra o preço original, o desconto aplicado e o valor final",
+    back:"Sistema do aplicativo calcula o desconto e aplica na compra",
+    support:P("Sistema bancário Carimbo")}
+  ]
+}
+];
+
+/* ---------- ESTADO ---------- */
+var state = {bp:0, step:0, view:"jornada", off:{}};
+
+/* ---------- UTILITÁRIOS ---------- */
+function el(tag, cls, text){
+  var n = document.createElement(tag);
+  if(cls) n.className = cls;
+  if(text != null) n.textContent = text;
+  return n;
+}
+function val(c){ return c == null ? null : (typeof c === "string" ? c : c.t); }
+function isPending(c){ return c != null && typeof c === "object" && c.pending; }
+function layerLabel(l, bp){ return l.id === "user" ? bp.userLabel : l.label; }
+function cellOf(step, id){ return id === "evid" ? step.evid : step[id]; }
+function visibleLayers(){ return LAYERS.filter(function(l){ return !state.off[l.id]; }); }
+
+/* ---------- RENDER ---------- */
+function renderTabs(){
+  var box = document.getElementById("tabs");
+  box.textContent = "";
+  BPS.forEach(function(bp, i){
+    var b = el("button","tab",bp.tab);
+    b.type = "button";
+    b.setAttribute("role","tab");
+    b.setAttribute("aria-selected", i === state.bp ? "true" : "false");
+    b.addEventListener("click", function(){ state.bp = i; state.step = 0; renderAll(); });
+    box.appendChild(b);
+  });
+}
+
+function renderPersona(){
+  var bp = BPS[state.bp], box = document.getElementById("persona");
+  box.textContent = "";
+  [["Persona", bp.persona],["Cenário", bp.scenario]].forEach(function(p){
+    var c = el("div","card");
+    c.appendChild(el("b",null,p[0]));
+    c.appendChild(el("span",null,p[1]));
+    box.appendChild(c);
+  });
+}
+
+function renderFilters(){
+  var bp = BPS[state.bp], box = document.getElementById("filters");
+  box.textContent = "";
+  box.appendChild(el("span","lbl","Camadas:"));
+  LAYERS.forEach(function(l){
+    var b = el("button","chip",layerLabel(l,bp));
+    b.type = "button";
+    b.insertBefore(el("span","dot"), b.firstChild);
+    b.style.setProperty("--c","var("+l.color+")");
+    b.setAttribute("aria-pressed", state.off[l.id] ? "false" : "true");
+    b.addEventListener("click", function(){
+      state.off[l.id] = !state.off[l.id];
+      if(visibleLayers().length === 0){ state.off = {}; }
+      renderFilters(); renderView();
+    });
+    box.appendChild(b);
+  });
+}
+
+function renderView(){
+  var bp = BPS[state.bp], box = document.getElementById("view");
+  box.textContent = "";
+  if(state.view === "mapa"){ renderMap(bp, box); } else { renderJourney(bp, box); }
+}
+
+function renderJourney(bp, box){
+  var strip = el("div","stepper");
+  bp.steps.forEach(function(s, i){
+    var b = el("button","step");
+    b.type = "button";
+    b.appendChild(el("em",null,String(i+1)));
+    b.appendChild(document.createTextNode(s.label));
+    if(i === state.step) b.setAttribute("aria-current","true");
+    b.addEventListener("click", function(){ state.step = i; renderView(); });
+    strip.appendChild(b);
+  });
+  box.appendChild(strip);
+
+  var s = bp.steps[state.step];
+  var d = el("div","detail");
+  d.appendChild(el("h3",null,s.label));
+  d.appendChild(el("div","sub","Etapa "+(state.step+1)+" de "+bp.steps.length));
+
+  var vis = visibleLayers();
+  vis.forEach(function(l, idx){
+    var c = cellOf(s, l.id), t = val(c);
+    var row = el("div","layer"+(t ? "" : " empty"));
+    row.style.setProperty("--c","var("+l.color+")");
+    row.appendChild(el("b",null,layerLabel(l,bp)));
+    var p = el("p",null,t || "Nada acontece aqui nesta etapa.");
+    if(isPending(c)) p.appendChild(el("span","pend","em definição"));
+    row.appendChild(p);
+    d.appendChild(row);
+    var next = vis[idx+1];
+    if(next && l.id === "user" && next.id === "front") d.appendChild(el("div","divider","Linha de interação"));
+    if(next && l.id === "front" && next.id === "back") d.appendChild(el("div","divider","Linha de visibilidade"));
+  });
+
+  var pager = el("div","pager");
+  var prev = el("button","nav-btn","← Etapa anterior"); prev.type = "button";
+  var nxt = el("button","nav-btn","Próxima etapa →"); nxt.type = "button";
+  if(state.step === 0) prev.disabled = true;
+  if(state.step === bp.steps.length-1) nxt.disabled = true;
+  prev.addEventListener("click", function(){ go(-1); });
+  nxt.addEventListener("click", function(){ go(1); });
+  pager.appendChild(prev); pager.appendChild(nxt);
+  d.appendChild(pager);
+  box.appendChild(d);
+
+  var cur = strip.querySelector('[aria-current="true"]');
+  if(cur) strip.scrollLeft = cur.offsetLeft - (strip.clientWidth - cur.offsetWidth)/2; /* só horizontal: scrollIntoView puxava a página inteira até aqui */
+}
+
+function renderMap(bp, box){
+  var vis = visibleLayers();
+  var wrap = el("div","mapwrap");
+  var g = el("div","map");
+  g.style.gridTemplateColumns = "170px repeat("+bp.steps.length+", 200px)";
+  g.appendChild(el("div","corner"));
+  bp.steps.forEach(function(s, i){
+    var h = el("div","h",(i+1)+". "+s.label);
+    h.addEventListener("click", function(){ state.step = i; state.view = "jornada"; syncSeg(); renderView(); });
+    g.appendChild(h);
+  });
+  vis.forEach(function(l){
+    var rl = el("div","rl",layerLabel(l,bp));
+    rl.style.setProperty("--c","var("+l.color+")");
+    g.appendChild(rl);
+    bp.steps.forEach(function(s, i){
+      var t = val(cellOf(s, l.id));
+      var c = el("div","c"+(t ? "" : " nil"));
+      c.style.setProperty("--c","var("+l.color+")");
+      c.appendChild(el("span",null,t || "—"));
+      c.addEventListener("click", function(){ state.step = i; state.view = "jornada"; syncSeg(); renderView(); });
+      g.appendChild(c);
+    });
+  });
+  wrap.appendChild(g);
+  box.appendChild(wrap);
+}
+
+function syncSeg(){
+  document.querySelectorAll("#seg button").forEach(function(b){
+    b.setAttribute("aria-pressed", b.getAttribute("data-v") === state.view ? "true" : "false");
+  });
+}
+function renderAll(){ renderTabs(); renderPersona(); renderFilters(); renderView(); }
+function go(delta){
+  var n = BPS[state.bp].steps.length;
+  var next = Math.max(0, Math.min(n-1, state.step + delta));
+  if(next !== state.step){ state.step = next; if(state.view === "jornada") renderView(); }
+}
+
+document.getElementById("seg").addEventListener("click", function(e){
+  var b = e.target.closest("button"); if(!b) return;
+  state.view = b.getAttribute("data-v"); syncSeg(); renderView();
+});
+
+/* setas só atuam quando a seção de blueprints está na tela */
+document.addEventListener("keydown", function(e){
+  if(e.key === "f" || e.key === "F"){ if(!e.metaKey && !e.ctrlKey) toggleFs(); return; }
+  if(e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
+  var r = document.getElementById("blueprints").getBoundingClientRect();
+  var mid = window.innerHeight/2;
+  if(r.top < mid && r.bottom > mid){ go(e.key === "ArrowRight" ? 1 : -1); }
+});
+
+/* ---------- TELA CHEIA ---------- */
+function toggleFs(){
+  var d = document, root = d.documentElement;
+  if(!d.fullscreenElement){ if(root.requestFullscreen) root.requestFullscreen(); }
+  else if(d.exitFullscreen){ d.exitFullscreen(); }
+}
+document.getElementById("fs").addEventListener("click", toggleFs);
+document.addEventListener("fullscreenchange", function(){
+  document.getElementById("fs").textContent = document.fullscreenElement ? "Sair da tela cheia" : "Tela cheia";
+});
+
+/* ---------- NAV ATIVA ---------- */
+var links = {};
+document.querySelectorAll(".top a").forEach(function(a){ links[a.getAttribute("href").slice(1)] = a; });
+if("IntersectionObserver" in window){
+  var io = new IntersectionObserver(function(entries){
+    entries.forEach(function(en){
+      if(en.isIntersecting){
+        Object.keys(links).forEach(function(k){ links[k].classList.remove("on"); });
+        if(links[en.target.id]) links[en.target.id].classList.add("on");
+      }
+    });
+  }, {threshold:0.5});
+  document.querySelectorAll("main > section").forEach(function(s){ io.observe(s); });
+}
+
+renderAll();
+})();
+</script>
+<script>
+/* =====================================================================
+   BLOBS DE TINTA + MAPA DE TELAS (SVG próprio com pan/zoom)
+   Fonte do fluxo: docs/06-fluxo-de-telas.md (mermaid "Mapa de telas").
+   Contornos orgânicos são paths com ruído determinístico (seed): ficam nítidos em qualquer zoom.
+   ===================================================================== */
+(function(){
+"use strict";
+var NS = "http://www.w3.org/2000/svg";
+var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+/* ---------- utilitários de forma ---------- */
+function rng(a){ return function(){ a|=0; a=a+0x6D2B79F5|0; var t=Math.imul(a^a>>>15,1|a); t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; }; }
+function sv(tag, attrs, parent){
+  var n = document.createElementNS(NS, tag);
+  for(var k in attrs) n.setAttribute(k, attrs[k]);
+  if(parent) parent.appendChild(n);
+  return n;
+}
+function r1(n){ return Math.round(n*10)/10; }
+/* curva fechada suave (Catmull-Rom → Bézier) */
+function closed(p){
+  var n = p.length, d = "M"+r1(p[0][0])+" "+r1(p[0][1]);
+  for(var i=0;i<n;i++){
+    var p0=p[(i-1+n)%n], p1=p[i], p2=p[(i+1)%n], p3=p[(i+2)%n];
+    d += "C"+r1(p1[0]+(p2[0]-p0[0])/6)+" "+r1(p1[1]+(p2[1]-p0[1])/6)+" "+r1(p2[0]-(p3[0]-p1[0])/6)+" "+r1(p2[1]-(p3[1]-p1[1])/6)+" "+r1(p2[0])+" "+r1(p2[1]);
+  }
+  return d+"Z";
+}
+/* superelipse com ruído: n=2 elipse, ~4 retângulo arredondado, ~1.5 losango suave */
+function shape(cx, cy, w, h, n, seed, j){
+  var R = rng(seed), N = Math.max(18, Math.min(46, Math.round((w+h)/15))), e = 2/n, pts = [];
+  for(var i=0;i<N;i++){
+    var a = i/N*Math.PI*2, c = Math.cos(a), s = Math.sin(a);
+    pts.push([
+      cx + (w/2)*(c<0?-1:1)*Math.pow(Math.abs(c), e) + (R()-.5)*2*j,
+      cy + (h/2)*(s<0?-1:1)*Math.pow(Math.abs(s), e) + (R()-.5)*2*j
+    ]);
+  }
+  return closed(pts);
+}
+function blob(seed){
+  var R = rng(seed), N = 9, ry = .7 + R()*.3, pts = [];
+  for(var i=0;i<N;i++){
+    var a = i/N*Math.PI*2 + (R()-.5)*.35, r = 33 + R()*15;
+    pts.push([50+Math.cos(a)*r, 50+Math.sin(a)*r*ry]);
+  }
+  return closed(pts);
+}
+
+/* ---------- BLOBS DECORATIVOS (multiply, sem tocar o conteúdo) ---------- */
+/* [tinta, left %, top %, largura vw, giro °, seed]. Um rosa por tela; rosa×lima e laranja×ciano ficam longe. */
+var DECOR = {
+  inicio:    [["laranja",56,2,40,10,1],["ciano",76,38,30,-20,2],["lima",58,68,18,0,3],["rosa",88,70,12,30,4]],
+  pesquisa:  [["rosa",88,4,22,0,5],["lima",-15,66,20,0,6]],
+  conceito:  [["laranja",88,58,24,0,7],["ciano",-15,6,20,0,8]],
+  funciona:  [["rosa",90,6,20,0,9],["lima",-15,70,20,0,10]],
+  negocio:   [["lima",88,64,24,0,11],["laranja",-15,6,18,0,12]],
+  blueprints:[["ciano",92,4,18,0,13],["rosa",-15,70,14,0,18]],
+  fluxo:     [["laranja",-15,6,20,0,14],["rosa",90,72,22,0,15]],
+  proximos:  [["rosa",84,44,28,0,16],["ciano",-15,6,20,0,17]]
+};
+var placers = [];
+Object.keys(DECOR).forEach(function(id){
+  var sec = document.getElementById(id); if(!sec) return;
+  var box = document.createElement("div"); box.className = "blobs"; box.setAttribute("aria-hidden","true");
+  DECOR[id].forEach(function(b){
+    var s = sv("svg", {viewBox:"0 0 100 100"}, box);
+    s.style.left = b[1]+"%"; placers.push(function(){ var H = sec.offsetHeight, hp = b[3]*window.innerWidth/100*.95, t = b[2]/100*H; s.style.top = Math.max(.03*H, Math.min(H-hp-.03*H, t))+"px"; }); s.style.width = b[3]+"vw"; s.style.transform = "rotate("+b[4]+"deg)"; s.style.filter = "drop-shadow(0 0 3.5vw color-mix(in srgb, var(--tinta-"+b[0]+") 55%, transparent))";
+    var p = sv("path", {d:blob(b[5]), filter:"url(#fibra)"}, s);
+    p.style.fill = "var(--tinta-"+b[0]+")";
+  });
+  sec.insertBefore(box, sec.firstChild);
+});
+
+function place(){ placers.forEach(function(p){ p(); }); }
+place(); window.addEventListener("resize", place); window.addEventListener("load", place);
+
+
+/* ---------- CARIMBOS REDONDOS DE SEÇÃO ---------- */
+(function(){
+  var S = {pesquisa:["PESQUISA","rosa",-11], conceito:["CONCEITO","azul",9], funciona:["COMO FUNCIONA","verde",-7], negocio:["NEGÓCIO","verm",12],
+           blueprints:["BLUEPRINTS","azul",-9], fluxo:["FLUXO DE TELAS","rosa",8], proximos:["PRÓXIMOS PASSOS","verde",-12]};
+  Object.keys(S).forEach(function(id){
+    var sec = document.getElementById(id); if(!sec) return;
+    var d = S[id], words = d[0].split(" "), lines = words.length > 2 ? [words.slice(0,2).join(" "), words.slice(2).join(" ")] : words;
+    if(words.length === 2){ lines = words; }
+    var el = document.createElement("div"); el.className = "secstamp"; el.setAttribute("aria-hidden","true");
+    el.style.setProperty("--st","var(--c-"+d[1]+")"); el.style.setProperty("--r", d[2]+"deg");
+    el.style.transform = "rotate("+d[2]+"deg)";
+    var y0 = 100 - (lines.length*16 + 14)/2 + 12, t = "";
+    lines.forEach(function(l, i){ t += '<text x="100" y="'+(y0+i*16)+'" font-size="'+(l.length > 8 ? 12 : 15)+'" font-weight="500">'+l+'</text>'; });
+    t += '<text x="100" y="'+(y0+lines.length*16+4)+'" font-size="9.5" letter-spacing="1">07 NOV 2026</text>';
+    el.innerHTML = '<svg viewBox="0 0 200 200"><defs><path id="ring-'+id+'" d="M100 100m-75 0a75 75 0 1 1 150 0a75 75 0 1 1-150 0"/></defs>'+
+      '<circle cx="100" cy="100" r="94" stroke-width="6"/><circle cx="100" cy="100" r="58" stroke-width="2.5"/>'+
+      '<text font-size="12.5" letter-spacing="1.5"><textPath href="#ring-'+id+'" textLength="468" lengthAdjust="spacing">CARIMBO · PUC-RIO · RIO DE JANEIRO · 2026 · </textPath></text>'+t+'</svg>';
+    sec.querySelector(".in").appendChild(el);
+  });
+})();
+
+/* ---------- CARIMBO DE ENTRADA ---------- */
+if("IntersectionObserver" in window){
+  document.querySelectorAll("main > section").forEach(function(sec){
+    var items = [].slice.call(sec.querySelectorAll("h1, h2, .ticket, .pp-entry, .callout, .flow span, .hero-stamp, .secstamp"));
+    items.forEach(function(n, i){ n.classList.add("stampable"); n.style.setProperty("--i", Math.min(i, 8)); });
+    new IntersectionObserver(function(es){
+      es.forEach(function(e){
+        if(!e.isIntersecting) items.forEach(function(n){ n.classList.remove("stamped"); });
+        else if(e.intersectionRatio >= .3) items.forEach(function(n){ n.classList.add("stamped"); });
+      });
+    }, {threshold:[0,.3]}).observe(sec);
+  });
+}
+
+/* ---------- DADOS DO MAPA ---------- */
+var FLOWS = [
+  {id:"f0", label:"Entrada",      ink:"ciano"},
+  {id:"f1", label:"Descoberta",   ink:"ciano"},
+  {id:"f2", label:"Check-in",     ink:"rosa"},
+  {id:"f3", label:"Noite ativa",  ink:"laranja"},
+  {id:"f4", label:"Pós-evento",   ink:"laranja"},
+  {id:"f5", label:"Passaporte",   ink:"lima"},
+  {id:"f6", label:"Benefícios",   ink:"lima"},
+  {id:"f7", label:"Conta",        ink:"ciano"}
+];
+var PAIR = {ciano:"rosa", rosa:"ciano", laranja:"rosa", lima:"ciano"}; /* duplas permitidas, nunca rosa×lima nem laranja×ciano */
+var COL = 290, X0 = 130;
+/* id, coluna, y, rótulo, tipo (s tela · t aba · c check-in · d decisão · g atalho), fluxo, largura */
+var NODES = [
+  ["A",0,200,"Abertura","s","f0"],
+  ["V",1,200,"Voucher\naplicado","s","f0"],
+
+  ["EX",2,60,"Explorar","t","f1"],
+  ["PA",2,260,"Passaporte","t","f5"],
+  ["CH",2,470,"Check-in","c","f2"],
+  ["BE",2,700,"Benefícios","t","f6"],
+  ["VC",2,930,"Você","t","f7"],
+
+  ["DE",3,60,"Detalhe\ndo evento","s","f1"],
+  ["TK",4,0,"Ticketeira\noficial","s","f1"],
+  ["QV",4,120,"Quem vai\n(opt-in)","s","f1"],
+
+  ["LV",3,260,"Livrinho\ndo mês","s","f5"],
+  ["BN",4,260,"Benefícios por\nnº de carimbos","s","f5"],
+  ["ANT",3,350,"Passaportes\nanteriores","s","f5"],
+  ["WR",4,350,"Wrapped\ninstagramável","s","f5"],
+
+  ["CAD",3,470,"Tem conta?","d","f2",190],
+  ["CM",4,395,"Cadastro mínimo +\nlocalização + opt-in","s","f2",220],
+  ["GPS",5,470,"GPS\nconfirma?","d","f2",190],
+  ["ERR",5,585,"Negado, impreciso\nou fora do raio","s","f2"],
+  ["ST",6,470,"Carimbar o\npassaporte","s","f2"],
+  ["PR",7,470,"Progresso e\nbenefício","s","f2"],
+  ["PQ",8,470,"3 perguntas rápidas\n(puláveis)","s","f2"],
+  ["NA",9,470,"Noite ativa","s","f3"],
+  ["CV",10,395,"Cartão virtual\nno bar","s","f3"],
+  ["T99",10,500,"Volta com 99","s","f3"],
+  ["PE",10,625,"Notificação:\navatar de ressaca","s","f4"],
+  ["RV",11,625,"Review curta\nou longa","s","f4"],
+
+  ["LJ",3,700,"Loja: pontos +\nprogresso","s","f6"],
+  ["TR",4,640,"Troque agora\n(com pontos)","s","f6"],
+  ["BL",4,780,"Bloqueados\n(próxima página)","s","f6"],
+  ["DB",5,640,"Detalhe do\nbenefício","s","f6"],
+  ["RS",6,580,"Resgatar:\nconfirma e desconta","s","f6"],
+  ["FP",6,700,"Faltam X pontos:\navaliar eventos","s","f6"],
+  ["PB",5,780,"Faltam X\ncarimbos","s","f6"],
+  ["GEX",6,780,"Explorar ↗","g","f6"],
+  ["GBE",7,590,"Benefícios ↗","g","f6"],
+
+  ["AM",3,850,"Adicionar amigo:\nimportar contatos","s","f7"],
+  ["PV",3,1010,"Privacidade\ne opt-ins","s","f7"],
+  ["CT",7,930,"Carteira de\nbenefícios","s","f7"]
+];
+/* origem, destino, opções {d: tracejada, l: rótulo, via: arco por cima} */
+var EDGES = [
+  ["A","V",{l:"voucher de influencer"}],
+  ["A","EX",{l:"orgânico",via:-70}],
+  ["V","EX"],
+  ["EX","DE"],["DE","TK"],["DE","QV"],
+  ["PA","LV"],["LV","BN"],["PA","ANT"],["LV","WR",{d:1,l:"depois"}],
+  ["CH","CAD"],["CAD","CM",{l:"não"}],["CAD","GPS",{l:"sim"}],["CM","GPS"],
+  ["GPS","ERR",{l:"não"}],["GPS","ST",{l:"sim"}],
+  ["ST","PR"],["PR","PQ"],["PQ","NA"],
+  ["NA","CV"],["NA","T99"],["NA","PE",{d:1,l:"dia seguinte"}],
+  ["PE","RV"],["RV","DE",{via:-260,l:"reviews voltam ao detalhe"}],
+  ["PR","GBE",{d:1,l:"desbloqueou benefício"}],
+  ["BE","LJ"],["LJ","TR"],["LJ","BL"],["TR","DB"],
+  ["DB","RS",{l:"pontos suficientes"}],["DB","FP",{l:"faltam pontos"}],
+  ["BL","PB"],["PB","GEX"],
+  ["RS","CT"],["CT","NA",{d:1,l:"na festa"}],
+  ["VC","CT"],["VC","PV"],["VC","AM"]
+];
+
+/* ---------- CONSTRUÇÃO DO SVG ---------- */
+var vw = document.getElementById("vw");
+if(!vw) return;
+var svg = sv("svg", {role:"img", "aria-label":"Mapa de telas do app do frequentador"}, null);
+vw.insertBefore(svg, vw.firstChild);
+var defs = sv("defs", {}, svg);
+var mk = sv("marker", {id:"arr", viewBox:"0 0 10 10", refX:"8", refY:"5", markerWidth:"7", markerHeight:"7", orient:"auto"}, defs);
+sv("path", {d:"M1 1.2 L9 5 L1 8.8 Z", fill:"#fbfbfb"}, mk);
+var cam = sv("g", {}, svg);
+var gGrp = sv("g", {}, cam), gEdge = sv("g", {}, cam), gNode = sv("g", {}, cam), gLbl = sv("g", {}, cam);
+
+var N = {}, inkOf = {};
+FLOWS.forEach(function(f){ inkOf[f.id] = f.ink; });
+NODES.forEach(function(d, i){
+  var o = {id:d[0], x:X0+d[1]*COL, y:d[2], label:d[3], type:d[4], flow:d[5], w:d[6]||190, h:64, seed:i*7+3};
+  if(o.type === "t"){ o.w = 180; o.h = 60; }
+  if(o.type === "c"){ o.w = 130; o.h = 130; }
+  if(o.type === "d"){ o.h = 92; }
+  if(o.type === "g"){ o.w = 170; o.h = 52; }
+  N[o.id] = o;
+});
+
+/* chapa da barra de abas (papel, objeto físico) */
+(function(){
+  var ids = ["EX","PA","CH","BE","VC"], x0=1e9,x1=-1e9,y0=1e9,y1=-1e9;
+  ids.forEach(function(k){ var n=N[k]; x0=Math.min(x0,n.x-n.w/2); x1=Math.max(x1,n.x+n.w/2); y0=Math.min(y0,n.y-n.h/2); y1=Math.max(y1,n.y+n.h/2); });
+  x0-=36; x1+=36; y0-=54; y1+=36;
+  sv("path", {d:shape((x0+x1)/2,(y0+y1)/2,x1-x0,y1-y0,7,99,3.5), style:"fill:color-mix(in srgb,var(--tinta-ciano) 14%,var(--raised))"}, gGrp);
+  var t = sv("text", {x:(x0+x1)/2, y:y0+30, class:"grp"}, gGrp); t.textContent = "Tab bar";
+})();
+
+/* setas */
+function edge(a, b, o){
+  o = o || {};
+  var A = N[a], B = N[b], sx, sy, ex, ey, d, mx, my;
+  if(o.via != null){
+    sx = A.x; sy = A.y - A.h/2 - 2; ex = B.x; ey = B.y - B.h/2 - 6;
+    d = "M"+sx+" "+sy+"C"+sx+" "+o.via+" "+ex+" "+o.via+" "+ex+" "+ey;
+    mx = (sx+ex)/2; my = (sy+6*o.via+ey)/8;
+  } else {
+    sx = A.x + A.w/2 + 2; ex = B.x - B.w/2 - 6;
+    if(ex - sx >= 40){
+      sy = A.y; ey = B.y;
+      var dx = Math.max(40, (ex-sx)*.5);
+      d = "M"+sx+" "+sy+"C"+(sx+dx)+" "+sy+" "+(ex-dx)+" "+ey+" "+ex+" "+ey;
+    } else {
+      var dir = B.y > A.y ? 1 : -1;
+      sx = A.x; sy = A.y + dir*(A.h/2+2); ex = B.x; ey = B.y - dir*(B.h/2+6);
+      var dy = Math.max(40, Math.abs(ey-sy)*.5);
+      d = "M"+sx+" "+sy+"C"+sx+" "+(sy+dir*dy)+" "+ex+" "+(ey-dir*dy)+" "+ex+" "+ey;
+    }
+    mx = (sx+ex)/2; my = (sy+ey)/2;
+  }
+  var p = sv("path", {d:d, fill:"none", stroke:"#fbfbfb", "stroke-width":"2", "stroke-linecap":"round", "marker-end":"url(#arr)"}, gEdge);
+  if(o.d) p.setAttribute("stroke-dasharray", "7 7");
+  if(o.l){ var t = sv("text", {x:r1(mx), y:r1(my)+4, class:"el"}, gLbl); t.textContent = o.l; }
+}
+EDGES.forEach(function(e){ edge(e[0], e[1], e[2]); });
+
+/* nós: duas chapas fora de registro em multiply, texto branco por cima (regra de botão do DS) */
+NODES.forEach(function(d){
+  var n = N[d[0]], ink = inkOf[n.flow];
+  var g = sv("g", {"data-flow":n.flow}, gNode);
+  var ex = n.type === "t" ? 2.6 : n.type === "c" ? 2 : n.type === "d" ? 1.5 : 4;
+  var lines = n.label.split("\n"), lh = 18, y0 = n.y - (lines.length-1)*lh/2 + 5;
+  if(n.type === "g"){
+    g.setAttribute("class", "ghost");
+    sv("path", {d:shape(n.x, n.y, n.w, n.h, 3, n.seed, 1.6), fill:"#3a2f47"}, g);
+  } else {
+    g.style.isolation = "isolate";
+    if(n.type === "c") g.setAttribute("class", "big");
+    var p1 = sv("path", {d:shape(n.x, n.y, n.w, n.h, ex, n.seed, 2.2)}, g); p1.style.fill = "var(--tinta-"+ink+")";
+  }
+  var t = sv("text", {}, g);
+  lines.forEach(function(s, i){ var ts = sv("tspan", {x:n.x, y:r1(y0+i*lh)}, t); ts.textContent = s; });
+});
+
+/* ---------- CÂMERA (pan + zoom) ---------- */
+var K = 1, TX = 0, TY = 0, KMIN = .08, KMAX = 3, touched = false, anim = null;
+var chipEls = {};
+function apply(){
+  cam.setAttribute("transform", "translate("+r1(TX)+" "+r1(TY)+") scale("+K+")");
+  vw.style.backgroundPosition = r1(TX)+"px "+r1(TY)+"px";
+  vw.style.backgroundSize = r1(28*K)+"px "+r1(28*K)+"px";
+}
+function bounds(flow){
+  var x0=1e9,x1=-1e9,y0=1e9,y1=-1e9;
+  Object.keys(N).forEach(function(k){
+    var n = N[k]; if(flow && [].concat(flow).indexOf(n.flow) < 0) return;
+    x0=Math.min(x0,n.x-n.w/2); x1=Math.max(x1,n.x+n.w/2); y0=Math.min(y0,n.y-n.h/2); y1=Math.max(y1,n.y+n.h/2);
+  });
+  if(!flow) y0 = Math.min(y0, -150); /* inclui os arcos por cima */
+  return {x0:x0, x1:x1, y0:y0, y1:y1};
+}
+function target(b, pad, kmax){
+  var r = vw.getBoundingClientRect(), bw = b.x1-b.x0, bh = b.y1-b.y0;
+  var k = Math.max(KMIN, Math.min((r.width-2*pad)/bw, (r.height-2*pad)/bh, kmax));
+  return {k:k, tx:(r.width-bw*k)/2 - b.x0*k, ty:(r.height-bh*k)/2 - b.y0*k};
+}
+function goTo(t){
+  if(anim) cancelAnimationFrame(anim);
+  if(reduce){ K=t.k; TX=t.tx; TY=t.ty; apply(); return; }
+  var k0=K, x0=TX, y0=TY, t0=performance.now(), dur=520;
+  (function step(now){
+    var u = Math.min(1, (now-t0)/dur), e = 1-Math.pow(1-u, 3);
+    K = k0 + (t.k-k0)*e; TX = x0 + (t.tx-x0)*e; TY = y0 + (t.ty-y0)*e; apply();
+    if(u < 1) anim = requestAnimationFrame(step);
+  })(t0);
+}
+function setChip(id){ Object.keys(chipEls).forEach(function(k){ chipEls[k].setAttribute("aria-pressed", k === id ? "true" : "false"); }); }
+function user(){ touched = true; if(anim){ cancelAnimationFrame(anim); anim = null; } setChip(null); }
+function zoomAt(px, py, f){
+  var nk = Math.max(KMIN, Math.min(KMAX, K*f)); if(nk === K) return;
+  TX = px - (px-TX)*nk/K; TY = py - (py-TY)*nk/K; K = nk; apply();
+}
+function center(){ var r = vw.getBoundingClientRect(); return [r.width/2, r.height/2]; }
+function fitAll(){ setChip("all"); goTo(target(bounds(), 50, 1)); }
+
+/* chips = legenda + atalhos de foco por fluxo (bom para apresentar) */
+var box = document.getElementById("fchips");
+function addChip(id, label, ink, fn){
+  var b = document.createElement("button"); b.type = "button"; b.className = "fchip";
+  if(ink){ var s = document.createElement("span"); s.className = "dot"; s.style.setProperty("--c", "var(--tinta-"+ink+")"); b.appendChild(s); }
+  b.appendChild(document.createTextNode(label));
+  b.setAttribute("aria-pressed", "false");
+  b.addEventListener("click", function(){ touched = true; setChip(id); fn(); });
+  chipEls[id] = b; box.appendChild(b);
+}
+addChip("all", "Tudo", null, function(){ goTo(target(bounds(), 50, 1)); });
+var HOME = ["f0","f1"];
+FLOWS.forEach(function(f){
+  if(f.id === "f1") return;
+  var ids = f.id === "f0" ? HOME : [f.id];
+  addChip(f.id, f.id === "f0" ? "Entrada e descoberta" : f.label, f.ink, function(){ goTo(target(bounds(ids), 80, 1.1)); });
+});
+
+/* botões */
+document.getElementById("zin").addEventListener("click", function(){ user(); var c = center(); zoomAt(c[0], c[1], 1.35); });
+document.getElementById("zout").addEventListener("click", function(){ user(); var c = center(); zoomAt(c[0], c[1], 1/1.35); });
+document.getElementById("zfit").addEventListener("click", function(){ touched = false; fitAll(); });
+
+/* roda do mouse / pinça do trackpad */
+vw.addEventListener("wheel", function(e){
+  if(!(e.ctrlKey || e.metaKey)) return;
+  e.preventDefault(); user();
+  var r = vw.getBoundingClientRect();
+  zoomAt(e.clientX-r.left, e.clientY-r.top, Math.exp(-e.deltaY*(e.ctrlKey ? .01 : .0022)));
+}, {passive:false});
+
+/* arrastar e pinça (ponteiros) */
+var ptr = {}, last = null;
+function pts(){ return Object.keys(ptr).map(function(k){ return ptr[k]; }); }
+vw.addEventListener("pointerdown", function(e){
+  if(e.target.closest(".vtools")) return;
+  user(); vw.setPointerCapture(e.pointerId); ptr[e.pointerId] = {x:e.clientX, y:e.clientY};
+  vw.classList.add("drag"); last = null;
+});
+vw.addEventListener("pointermove", function(e){
+  if(!ptr[e.pointerId]) return;
+  var before = pts().map(function(p){ return {x:p.x, y:p.y}; });
+  ptr[e.pointerId] = {x:e.clientX, y:e.clientY};
+  var now = pts();
+  if(now.length === 1){
+    TX += now[0].x - before[0].x; TY += now[0].y - before[0].y; apply();
+  } else if(now.length >= 2){
+    var r = vw.getBoundingClientRect();
+    var d0 = Math.hypot(before[0].x-before[1].x, before[0].y-before[1].y), d1 = Math.hypot(now[0].x-now[1].x, now[0].y-now[1].y);
+    var cx = (now[0].x+now[1].x)/2 - r.left, cy = (now[0].y+now[1].y)/2 - r.top;
+    var px = (before[0].x+before[1].x)/2 - (now[0].x+now[1].x)/2, py = (before[0].y+before[1].y)/2 - (now[0].y+now[1].y)/2;
+    TX -= px; TY -= py;
+    if(d0 > 0) zoomAt(cx, cy, d1/d0); else apply();
+  }
+});
+function up(e){ delete ptr[e.pointerId]; if(!Object.keys(ptr).length) vw.classList.remove("drag"); }
+vw.addEventListener("pointerup", up);
+vw.addEventListener("pointercancel", up);
+
+/* teclado: + − 0 e setas (só com o mapa focado) */
+vw.addEventListener("keydown", function(e){
+  var c = center(), s = 80, ok = true;
+  if(e.key === "+" || e.key === "="){ user(); zoomAt(c[0], c[1], 1.25); }
+  else if(e.key === "-" || e.key === "_"){ user(); zoomAt(c[0], c[1], .8); }
+  else if(e.key === "0"){ touched = false; fitAll(); }
+  else if(e.key === "ArrowLeft"){ user(); TX += s; apply(); }
+  else if(e.key === "ArrowRight"){ user(); TX -= s; apply(); }
+  else if(e.key === "ArrowUp"){ user(); TY += s; apply(); }
+  else if(e.key === "ArrowDown"){ user(); TY -= s; apply(); }
+  else ok = false;
+  if(ok){ e.preventDefault(); e.stopPropagation(); }
+});
+
+/* enquadra no início e ao redimensionar, enquanto ninguém mexeu */
+function home(){ var t = target(bounds(HOME), 80, 1.1); K=t.k; TX=t.tx; TY=t.ty; apply(); }
+setChip("f0"); home();
+window.addEventListener("resize", function(){ if(!touched) home(); });
+})();
+</script>
+</body>
+</html>
